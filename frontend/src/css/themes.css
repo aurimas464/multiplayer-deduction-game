@@ -1,0 +1,62 @@
+:root {
+	--bg-primary: rgb(10, 10, 10);
+	--bg-secondary: rgb(50, 50, 50);
+	--text-primary: rgb(245, 245, 245);
+	--text-secondary: rgb(205, 205, 205);
+
+	--shadow-color: rgba(0, 0, 0, 0.80);
+	--input-bg: rgb(30, 30, 30);
+	--hover-gray: rgb(100, 100, 100);
+
+	--error-text: rgb(250, 40, 40);
+	--success-text: rgb(125, 200, 100);
+
+	--accent-300: rgb(175, 35, 50);
+	--accent-500: rgb(110, 20, 30);
+	--accent-700: rgb(60, 10, 15);
+
+	--accent-primary: var(--accent-500);
+	--accent-primary-light: var(--accent-300);
+	--accent-primary-dark: var(--accent-700);
+}
+
+[data-theme="light"] {
+	--bg-primary: rgb(245, 245, 245);
+	--bg-secondary: rgb(205, 205, 205);
+	--text-primary: rgb(10, 10, 10);
+	--text-secondary: rgb(50, 50, 50);
+
+	--shadow-color: rgba(0, 0, 0, 0.20);
+	--input-bg: rgb(225, 225, 225);
+	--hover-gray: rgb(155, 155, 155);
+
+	--error-text: rgb(200, 50, 50);
+	--success-text: rgb(50, 140, 70);
+
+	--accent-primary-light: var(--accent-700);
+	--accent-primary-dark: var(--accent-300);
+}
+
+[data-color-theme="red"] {
+	--accent-300: rgb(175, 35, 50);
+	--accent-500: rgb(110, 20, 30);
+	--accent-700: rgb(60, 10, 15);
+}
+
+[data-color-theme="blue"] {
+	--accent-300: rgb(80, 90, 255);
+	--accent-500: rgb(30, 55, 200);
+	--accent-700: rgb(10, 20, 80);
+}
+
+[data-color-theme="purple"] {
+	--accent-300: rgb(140, 100, 210);
+	--accent-500: rgb(75, 40, 120);
+	--accent-700: rgb(40, 20, 60);
+}
+
+[data-color-theme="gold"] {
+	--accent-300: rgb(230, 210, 155);
+	--accent-500: rgb(160, 140, 90);
+	--accent-700: rgb(100, 80, 45);
+}

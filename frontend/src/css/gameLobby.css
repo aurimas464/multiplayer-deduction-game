@@ -1,0 +1,196 @@
+.game-lobby-page {
+	min-height: 100vh;
+	padding: 1rem;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.lobby-container {
+	width: 100%;
+	max-width: 1000px;
+	height: min(90vh, 750px);
+	min-height: 0;
+	display: grid;
+	grid-template-rows: auto 1fr;
+	gap: 1rem;
+}
+
+.lobby-container * {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.lobby-container *::-webkit-scrollbar {
+	display: none;
+}
+
+.lobby-box {
+	background: var(--bg-primary);
+	border: 2px solid var(--accent-primary);
+	border-radius: 12px;
+	box-shadow: 0 0 25px var(--shadow-color);
+}
+
+.lobby-box-header {
+	padding: 0.25rem;
+	border-bottom: 2px solid var(--accent-primary);
+}
+
+.lobby-header-container {
+	width: fit-content;
+	max-width: 100%;
+	margin: 0 auto;
+	padding: 0.75rem;
+}
+
+.lobby-header-code {
+	font-family: "Cinzel";
+	font-weight: 700;
+	letter-spacing: 2px;
+}
+
+.lobby-content-layout {
+	height: 100%;
+	min-height: 300px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+}
+
+.left-section {
+	min-height: 300px;
+	display: grid;
+	grid-template-rows: 4fr 1fr;
+	gap: 1rem;
+}
+
+.settings-section {
+	min-height: 0;
+	display: grid;
+	grid-template-rows: 4fr 1fr;
+	gap: 1rem;
+}
+
+.players-section {
+	min-height: 0;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.right-section {
+	min-height: 0;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.players-seats {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	height: 25px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 0.75rem;
+}
+
+.player-item {
+	background: var(--bg-secondary);
+	border-radius: 6px;
+	border: 1px solid var(--accent-primary-dark);
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.5rem;
+}
+
+.player-item-empty {
+	background-color: var(--bg-primary);
+	transition: background-color 0.25s ease, transform 0.25s ease-in-out;
+	transform: scale(1);
+}
+
+.player-item-empty:hover {
+	background-color: var(--hover-gray);
+	cursor: pointer;
+	transform: scale(1.02);
+}
+
+.player-item-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.player-item-icons {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	white-space: nowrap;
+}
+
+.player-item-icons svg{
+	width: 30px;
+	height: 30px;
+	transform: none;
+}
+
+.players-actions {
+	display: flex;
+	align-items: baseline;
+	gap: 1rem;
+	margin: 0 auto;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+
+.button.lobby-box.success:hover {
+	background-color: var(--success-text);
+}
+
+.button.lobby-box.error:hover {
+	background-color: var(--error-text);
+}
+
+.player-item-left {
+	flex: 1 1 auto;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	overflow: hidden;
+}
+
+.player-seat {
+	flex: 0 0 auto;
+	width: 1.5em;
+}
+
+.player-name {
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.player-icon-lobby {
+	width: 40px;
+	height: 40px;
+	flex: 0 0 40px;
+	border: 1px solid var(--accent-primary);
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+@media (max-width: 768px) {
+	.lobby-content-layout {
+		grid-template-columns: 1fr;
+	}
+}

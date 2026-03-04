@@ -1,0 +1,101 @@
+import { useCallback, useEffect, useRef } from "react";
+import { usePopup } from "./PopupContext";
+import { useTranslation } from "./useTranslation";
+import { useWebSocket } from "./WebSocketContext";
+import type { ClientMessage, ServerMessage } from "../types/websocket";
+
+type NotifyOptions = {
+	rejectOn: (msg: ServerMessage) => boolean;
+	successOn: (msg: ServerMessage) => boolean;
+
+	onReject?: (msg: ServerMessage) => void;
+	onSuccess?: (msg: ServerMessage) => void;
+	onTimeout?: () => void;
+	onMessage?: (msg: ServerMessage) => void;
+};
+
+type Pending = NotifyOptions & {
+	done: boolean;
+};
+
+// Hook for using web socket notifications with loading popups
+export const useWebSocketNotifyWithLoading = () => {
+	const { showPopup, closePopup } = usePopup();
+	const { t } = useTranslation();
+	const { sendMessage, subscribe } = useWebSocket();
+
+	const pendingsRef = useRef<Map<string, Pending>>(new Map());
+
+	const finish = useCallback((loadingPopupId: string, fn: (p: Pending) => void) => {
+		const pending = pendingsRef.current.get(loadingPopupId);
+		if (!pending || pending.done) return;
+
+		pending.done = true;
+		pendingsRef.current.delete(loadingPopupId);
+
+		setTimeout(() => closePopup(loadingPopupId), 500);
+		fn(pending);
+	}, [closePopup]);
+
+	// Handle messages
+	useEffect(() => { 
+		const unsubscribe = subscribe((msg) => {
+			for (const [loadingPopupId, pending] of pendingsRef.current) {
+				if (pending.done) continue;
+
+				pending.onMessage?.(msg);
+
+				if (pending.rejectOn(msg)) {
+					finish(loadingPopupId, (p) => p.onReject?.(msg));
+					continue;
+				}
+
+				if (pending.successOn(msg)) {
+					finish(loadingPopupId, (p) => p.onSuccess?.(msg));
+				}
+			}
+		});
+
+		return () => {
+			for (const [loadingPopupId] of pendingsRef.current) {
+				finish(loadingPopupId, (p) => p.onTimeout?.());
+			}
+			unsubscribe();
+		};
+	}, [subscribe, finish]);
+
+	// Notify with loading
+	const notifyWithLoading = useCallback((message: ClientMessage, opts: NotifyOptions) => {
+		let loadingPopupId = "";
+
+		loadingPopupId = showPopup({
+			type: "loading",
+			title: t("common.loading"),
+			payload: {
+				onTimeout: () => {
+					finish(loadingPopupId, (p) => p.onTimeout?.());
+					showPopup({
+						type: "error",
+						title: t("common.error"),
+						payload: { message: t("common.timeoutError") },
+						autoCloseDelay: 5000
+					});
+				},
+			},
+		});
+
+		pendingsRef.current.set(loadingPopupId, {
+			rejectOn: opts.rejectOn,
+			successOn: opts.successOn,
+			onReject: opts.onReject,
+			onSuccess: opts.onSuccess,
+			onTimeout: opts.onTimeout,
+			onMessage: opts.onMessage,
+			done: false,
+		});
+
+		return sendMessage(message);
+	}, [finish, sendMessage, showPopup, t]);
+
+	return { notifyWithLoading };
+};

@@ -1,0 +1,134 @@
+generator client {
+	provider = "prisma-client-js"
+}
+
+datasource db {
+	provider = "mysql"
+	url      = env("DATABASE_URL")
+}
+
+enum Theme {
+	dark
+	light
+}
+
+enum ColorTheme {
+	red
+	blue
+	purple
+	gold
+}
+
+enum Language {
+	en
+	lt
+}
+
+enum PlayerType {
+	user
+	bot
+}
+
+enum GameStatus {
+	lobby
+	in_progress
+	finished
+	cancelled
+}
+
+model UserPlayer {
+	playerId Int @id
+	userId   Int @unique
+
+	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BotPlayer {
+	playerId Int @id
+	botId    Int @unique
+
+	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	bot    Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model User {
+	id       Int    @id @default(autoincrement())
+	username String @unique
+	email    String @unique
+	password String
+
+	theme      Theme      @default(dark)
+	colorTheme ColorTheme @default(red)
+	language   Language   @default(en)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	session    Session?
+	userPlayer UserPlayer?
+}
+
+model Session {
+	id               Int      @id @default(autoincrement())
+	userId           Int      @unique
+	refreshTokenHash String
+	refreshExpiresAt DateTime
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bot {
+	id   Int    @id @default(autoincrement())
+	name String @unique
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	botPlayer BotPlayer?
+}
+
+model Player {
+	id       Int        @id @default(autoincrement())
+	type     PlayerType
+
+	icon     String?    @db.MediumText
+	iconEtag String?
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	user UserPlayer?
+	bot  BotPlayer?
+
+	seats Seat[]
+}
+
+model Game {
+	id         Int        @id @default(autoincrement())
+	gameCode   String     @unique
+	status     GameStatus @default(lobby)
+	maxPlayers Int        @default(10)
+	minPlayers Int        @default(5)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	seats Seat[]
+}
+
+model Seat {
+	gameId   Int
+	playerId Int
+	number   Int
+
+	game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+	@@id([gameId, playerId])
+	@@unique([gameId, number])
+	@@index([playerId])
+}
