@@ -204,7 +204,7 @@
 	border: 2px solid var(--accent-primary);
 	border-radius: 5px;
 	position: relative;
-	font-family: 'Cinzel';
+	font-family: "Cinzel";
 	font-weight: 600;
 	z-index: 102;
 }

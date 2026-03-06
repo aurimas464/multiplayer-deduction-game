@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useRef, useState, useMemo } from 'react';
-import type { PopupType, PopupData } from '../types/popup';
+import React, { createContext, useCallback, useContext, useRef, useState, useMemo } from "react";
+import type { PopupType, PopupData } from "../types/popup";
 
-export type ShowPopupInput<T extends PopupType = PopupType> = Omit<PopupData<T>, 'id'>;
+export type ShowPopupInput<T extends PopupType = PopupType> = Omit<PopupData<T>, "id">;
 
 type PopupContextType = {
 	popups: PopupData[];
@@ -112,7 +112,7 @@ export const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 export const usePopup = () => {
 	const context = useContext(PopupContext);
 	if (context === undefined) {
-		throw new Error('No user context found!');
+		throw new Error("No user context found!");
 	}
 	return context;
 };

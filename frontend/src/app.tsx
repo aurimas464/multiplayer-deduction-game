@@ -1,16 +1,16 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import { UserProvider, useUser } from './contexts/UserContext';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import BaseLayout from './components/Base';
-import { PopupProvider } from './contexts/PopupContext';
-import PopupRenderer from './components/popups/PopupRenderer';
-import GameLobby from './pages/GameLobby';
-import { WebSocketProvider } from './contexts/WebSocketContext';
-import WebSocketUiBridge from './contexts/WebSocketUiBridge';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Home from "./pages/Home";
+import { UserProvider, useUser } from "./contexts/UserContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import BaseLayout from "./components/Base";
+import { PopupProvider } from "./contexts/PopupContext";
+import PopupRenderer from "./components/popups/PopupRenderer";
+import GameLobby from "./pages/GameLobby";
+import { WebSocketProvider } from "./contexts/WebSocketContext";
+import WebSocketUiBridge from "./contexts/WebSocketUiBridge";
 
 const ProtectedRoute = () => {
 	const { user, authReady } = useUser();

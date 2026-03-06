@@ -1,4 +1,4 @@
-const ACCESS_TOKEN_KEY = 'accessToken';
+const ACCESS_TOKEN_KEY = "accessToken";
 
 let accessToken: string | null = sessionStorage.getItem(ACCESS_TOKEN_KEY);
 

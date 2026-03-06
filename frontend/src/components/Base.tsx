@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
-import { useTranslation } from '../contexts/useTranslation';
-import { ChatBubbleLeftRightIcon, UserGroupIcon, DocumentTextIcon, Cog6ToothIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import Settings from './sidebar/Settings';
-import { Tooltip } from '../components/Tooltip';
-import '../css/Base.css';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Outlet } from "react-router-dom";
+import { useTranslation } from "../contexts/useTranslation";
+import { ChatBubbleLeftRightIcon, UserGroupIcon, DocumentTextIcon, Cog6ToothIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import Settings from "./sidebar/Settings";
+import { Tooltip } from "../components/Tooltip";
+import "../css/Base.css";
 import { pruneOldIcons } from "../utils/localForage";
 
 const MIN_WIDTH = 200;
@@ -12,7 +12,7 @@ const MIN_WIDTH = 200;
 const Base = () => {
 	const [sidebarExpanded, setSidebarExpanded] = useState(true);
 	const [sidebarWidth, setSidebarWidth] = useState(300);
-	const [activeSidebarSection, setActiveSidebarSection] = useState<'chat' | 'friends' | 'notes' | 'settings'>('chat');
+	const [activeSidebarSection, setActiveSidebarSection] = useState<"chat" | "friends" | "notes" | "settings">("chat");
 
 	const { t } = useTranslation();
 
@@ -23,10 +23,10 @@ const Base = () => {
 	}, []);
 
 	const sidebarSections = [
-		{ id: 'chat' as const, icon: ChatBubbleLeftRightIcon, label: t('components.sidebar.chats.header') },
-		{ id: 'friends' as const, icon: UserGroupIcon, label: t('components.sidebar.friends.header') },
-		{ id: 'notes' as const, icon: DocumentTextIcon, label: t('components.sidebar.notes.header') },
-		{ id: 'settings' as const, icon: Cog6ToothIcon, label: t('components.sidebar.settings.header') },
+		{ id: "chat" as const, icon: ChatBubbleLeftRightIcon, label: t("components.sidebar.chats.header") },
+		{ id: "friends" as const, icon: UserGroupIcon, label: t("components.sidebar.friends.header") },
+		{ id: "notes" as const, icon: DocumentTextIcon, label: t("components.sidebar.notes.header") },
+		{ id: "settings" as const, icon: Cog6ToothIcon, label: t("components.sidebar.settings.header") },
 	];
 
 	const toggleSidebar = useCallback(() => {
@@ -66,12 +66,12 @@ const Base = () => {
 		};
 
 		const handleMouseUp = () => {
-			document.removeEventListener('mousemove', handleMouseMove);
-			document.removeEventListener('mouseup', handleMouseUp);
+			document.removeEventListener("mousemove", handleMouseMove);
+			document.removeEventListener("mouseup", handleMouseUp);
 		};
 
-		document.addEventListener('mousemove', handleMouseMove);
-		document.addEventListener('mouseup', handleMouseUp);
+		document.addEventListener("mousemove", handleMouseMove);
+		document.addEventListener("mouseup", handleMouseUp);
 	}, [sidebarExpanded, sidebarWidth]);
 
 	useEffect(() => {
@@ -89,8 +89,8 @@ const Base = () => {
 			});
 		};
 
-		window.addEventListener('resize', handleResize);
-		return () => window.removeEventListener('resize', handleResize);
+		window.addEventListener("resize", handleResize);
+		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
 	const mainStyle = sidebarExpanded
@@ -99,21 +99,21 @@ const Base = () => {
 			width: `calc(100% - ${sidebarWidth}px)`,
 		}
 		: {
-			marginLeft: '60px',
-			width: 'calc(100% - 60px)',
+			marginLeft: "60px",
+			width: "calc(100% - 60px)",
 		};
 
 	const renderSidebarContent = () => {
 		if (!sidebarExpanded) return null;
 
 		switch (activeSidebarSection) {
-			case 'notes':
+			case "notes":
 				return <div>Notes</div>;
-			case 'chat':
+			case "chat":
 				return <div>Chat</div>;
-			case 'friends':
+			case "friends":
 				return <div>Friends</div>;
-			case 'settings':
+			case "settings":
 				return <Settings />;
 			default:
 				return null;
@@ -127,7 +127,7 @@ const Base = () => {
 				style={sidebarExpanded ? { width: `${sidebarWidth}px` } : undefined}
 			>
 				<div className="sidebar-header">
-					{sidebarExpanded && <h1 className="sidebar-title">{t('components.sidebar.menu')}</h1>}
+					{sidebarExpanded && <h1 className="sidebar-title">{t("components.sidebar.menu")}</h1>}
 
 					<button className="toggle-button" onClick={toggleSidebar} type="button">
 						{sidebarExpanded ? <ChevronLeftIcon className="icon" /> : <ChevronRightIcon className="icon" />}
@@ -147,7 +147,7 @@ const Base = () => {
 								<button
 									key={section.id}
 									type="button"
-									className={`nav-item ${activeSidebarSection === section.id ? 'active' : ''}`}
+									className={`nav-item ${activeSidebarSection === section.id ? "active" : ""}`}
 									onClick={() => setActiveSidebarSection(section.id)}
 								>
 									<section.icon className="nav-icon" />
@@ -169,7 +169,7 @@ const Base = () => {
 				)}
 			</aside>
 
-			<main className={`main-content ${sidebarExpanded ? 'sidebar-expanded' : ''}`} style={mainStyle}>
+			<main className={`main-content ${sidebarExpanded ? "sidebar-expanded" : ""}`} style={mainStyle}>
 				<Outlet />
 			</main>
 		</div>

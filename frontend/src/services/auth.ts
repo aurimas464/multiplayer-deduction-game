@@ -1,8 +1,8 @@
-import axios from 'axios';
-import type { LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
-import type { ApiResponse } from '../types';
-import { tokenSession } from './api/tokenSession';
-import { apiRequest } from './api/apiRequest';
+import axios from "axios";
+import type { LoginCredentials, RegisterData, AuthResponse } from "../types/auth";
+import type { ApiResponse } from "../types";
+import { tokenSession } from "./api/tokenSession";
+import { apiRequest } from "./api/apiRequest";
 
 const baseURL = import.meta.env.VITE_API_URL;
 
@@ -27,8 +27,8 @@ export const authService = {
 
 	async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {
 		const res = await apiRequest<AuthResponse>(authHttp, {
-			method: 'POST',
-			url: '/auth/register',
+			method: "POST",
+			url: "/auth/register",
 			data: {
 				username: data.username,
 				email: data.email,
@@ -45,8 +45,8 @@ export const authService = {
 
 	async login(credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> {
 		const res = await apiRequest<AuthResponse>(authHttp, {
-			method: 'POST',
-			url: '/auth/login',
+			method: "POST",
+			url: "/auth/login",
 			data: credentials,
 		});
 
@@ -60,8 +60,8 @@ export const authService = {
 	async logout(): Promise<void> {
 		try {
 			await apiRequest<unknown>(authHttp, {
-				method: 'POST',
-				url: '/auth/logout',
+				method: "POST",
+				url: "/auth/logout",
 			});
 		} finally {
 			this.clearAccessToken();
@@ -70,8 +70,8 @@ export const authService = {
 
 	async refreshToken(): Promise<string | null> {
 		const res = await apiRequest<{ accessToken: string }>(authHttp, {
-			method: 'POST',
-			url: '/auth/refresh',
+			method: "POST",
+			url: "/auth/refresh",
 			data: {},
 			timeout: 5000,
 		});

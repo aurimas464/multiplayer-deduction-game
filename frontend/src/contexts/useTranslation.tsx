@@ -1,11 +1,11 @@
-import { useCallback } from 'react';
-import type { Language } from '../types/settings';
-import { translations } from '../locales';
-import { useLanguage } from './LanguageContext';
+import { useCallback } from "react";
+import type { Language } from "../types/settings";
+import { translations } from "../locales";
+import { useLanguage } from "./LanguageContext";
 
 // Resolve nested translation from  translations object
 const getNestedValue = (language_obj: any, path: string) => {
-	const keys = path.split('.');
+	const keys = path.split(".");
 	let value = language_obj;
 
 	for (const k of keys) {
@@ -33,7 +33,7 @@ export const useTranslation = () => {
 
 			const raw = getNestedValue(translations?.[lang], key);
 
-			if (typeof raw !== 'string') return key;
+			if (typeof raw !== "string") return key;
 
 			// Replace {param} placeholders in string values with actual values
 			let result = raw;

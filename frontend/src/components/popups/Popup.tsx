@@ -1,10 +1,10 @@
-import type { PopupPosition } from '../../types/popup';
-import { useSidebarPosition } from '../../contexts/useSidebarPosition';
-import { usePopup } from '../../contexts/PopupContext';
-import { Rnd } from 'react-rnd';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import '../../css/popup.css';
+import type { PopupPosition } from "../../types/popup";
+import { useSidebarPosition } from "../../contexts/useSidebarPosition";
+import { usePopup } from "../../contexts/PopupContext";
+import { Rnd } from "react-rnd";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
+import "../../css/popup.css";
 
 type PopupProps = {
 	id: string;
@@ -44,24 +44,24 @@ const calculateInitialPosition = (position: PopupPosition, defaultWidth: number,
 	let top = 0;
 	let left = 0;
 
-	if (position === 'center') {
+	if (position === "center") {
 		left = (viewportWidth - defaultWidth) / 2;
 		top = (viewportHeight - defaultHeight) / 2;
 	} else {
 		switch (position) {
-			case 'top-left':
+			case "top-left":
 				top = 20;
 				left = 20;
 				break;
-			case 'top-right':
+			case "top-right":
 				top = 20;
 				left = viewportWidth - defaultWidth - 20;
 				break;
-			case 'bottom-left':
+			case "bottom-left":
 				top = viewportHeight - defaultHeight - 20;
 				left = 20;
 				break;
-			case 'bottom-right':
+			case "bottom-right":
 				top = viewportHeight - defaultHeight - 20;
 				left = viewportWidth - defaultWidth - 20;
 				break;
@@ -368,7 +368,7 @@ const Popup = ({
 
 		// Prevent dragging when interacting with header buttons
 		const target = e.target as HTMLElement;
-		if (target.closest('button')) return;
+		if (target.closest("button")) return;
 
 		bringToFront();
 		setIsDragging(true);
@@ -416,7 +416,7 @@ const Popup = ({
 	};
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
-		if (e.key === 'Escape') {
+		if (e.key === "Escape") {
 			if (closable) handleClose();
 		}
 	};
@@ -427,17 +427,17 @@ const Popup = ({
 		<Rnd
 			ref={rndRef}
 			className={[
-				'popup',
-				isAppearing ? 'appearing' : '',
-				isMinimized ? 'minimized' : '',
-				isRestoringPosition.current ? 'restoring' : '',
-				isAnimating ? 'animating' : '',
-				isDragging ? 'dragging' : '',
-				isResizing ? 'resizing' : '',
-				isClosing ? 'closing' : '',
+				"popup",
+				isAppearing ? "appearing" : "",
+				isMinimized ? "minimized" : "",
+				isRestoringPosition.current ? "restoring" : "",
+				isAnimating ? "animating" : "",
+				isDragging ? "dragging" : "",
+				isResizing ? "resizing" : "",
+				isClosing ? "closing" : "",
 			]
 				.filter(Boolean)
-				.join(' ')}
+				.join(" ")}
 			style={{
 				zIndex,
 				...(isMinimized
@@ -480,8 +480,8 @@ const Popup = ({
 					onPointerMove={!isMinimized ? handleHeaderPointerMove : undefined}
 					onPointerUp={!isMinimized ? handleHeaderPointerUp : undefined}
 				>
-					<div className={`popup-icon-container ${icon ? 'visible' : ''}`}>
-						{icon ? icon : title ? title.charAt(0).toUpperCase() : ''}
+					<div className={`popup-icon-container ${icon ? "visible" : ""}`}>
+						{icon ? icon : title ? title.charAt(0).toUpperCase() : ""}
 					</div>
 
 					<div className="popup-title">{title}</div>

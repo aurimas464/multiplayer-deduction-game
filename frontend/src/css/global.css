@@ -15,7 +15,7 @@ body {
 	color: var(--text-primary);
 	line-height: 1.5;
 	overflow: hidden;
-	font-family: 'Spectral', serif;
+	font-family: "Spectral", serif;
 }
 
 .background {
@@ -46,7 +46,7 @@ h3,
 h4,
 h5,
 h6 {
-	font-family: 'Cinzel';
+	font-family: "Cinzel";
 	text-align: center;
 	color: var(--text-primary);
 	margin: 0;
@@ -88,7 +88,7 @@ p {
 }
 
 .form-group input {
-	font-family: 'Courier New', Courier, monospace;
+	font-family: "Courier New", Courier, monospace;
 }
 
 .error-message,

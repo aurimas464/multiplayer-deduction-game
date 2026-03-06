@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { themes, colorThemes, type Theme, type ColorTheme } from '../types/settings';
-import { useUser } from './UserContext';
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
+import { themes, colorThemes, type Theme, type ColorTheme } from "../types/settings";
+import { useUser } from "./UserContext";
 
 type ThemeContextType = {
 	theme: Theme;
@@ -25,10 +25,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
 	// Apply themes class to html
 	useEffect(() => {
-		document.documentElement.setAttribute('data-theme', theme);
+		document.documentElement.setAttribute("data-theme", theme);
 	}, [theme]);
 	useEffect(() => {
-		document.documentElement.setAttribute('data-color-theme', colorTheme);
+		document.documentElement.setAttribute("data-color-theme", colorTheme);
 	}, [colorTheme]);
 
 	useEffect(() => {
@@ -60,7 +60,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 export const useTheme = () => {
 	const context = useContext(ThemeContext);
 	if (!context) {
-		throw new Error('No theme context found!');
+		throw new Error("No theme context found!");
 	}
 	return context;
 };

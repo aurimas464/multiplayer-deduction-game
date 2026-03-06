@@ -1,13 +1,13 @@
-export type PopupType = 'success' | 'error' | 'loading' | 'joinGame';
+export type PopupType = "success" | "error" | "loading" | "joinGame";
 
 export type PopupPosition =
-	| 'auto'
-	| 'center'
-	| 'top-left'
-	| 'top-right'
-	| 'bottom-left'
-	| 'bottom-right'
-	| 'minimized';
+	| "auto"
+	| "center"
+	| "top-left"
+	| "top-right"
+	| "bottom-left"
+	| "bottom-right"
+	| "minimized";
 
 export type SuccessPopupPayload = { message?: string };
 export type ErrorPopupPayload = { message?: string };

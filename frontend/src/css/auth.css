@@ -61,7 +61,7 @@
 	color: var(--text-primary);
 	border: none;
 	border-radius: 8px;
-	font-family: 'Cinzel';
+	font-family: "Cinzel";
 	font-weight: 700;
 	cursor: pointer;
 	letter-spacing: 1px;
@@ -73,7 +73,7 @@
 }
 
 .submit-button::before {
-	content: '';
+	content: "";
 	position: absolute;
 	top: 0;
 	left: -100%;

@@ -4,8 +4,8 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 
-import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
+import authRoutes from "./routes/authRoutes";
+import userRoutes from "./routes/userRoutes";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 import { GameWebSocketServer } from "./websocket/WebSocketServer";
 
@@ -43,8 +43,8 @@ app.use(
 	})
 );
 
-app.use('/api/auth', authRoutes);
-app.use('/api/user', userRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
 app.use(errorMiddleware);
 
 const wss = new GameWebSocketServer(server, config);

@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { languages, type Language } from '../types/settings';
-import { useUser } from './UserContext';
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
+import { languages, type Language } from "../types/settings";
+import { useUser } from "./UserContext";
 
 type LanguageContextType = {
 	language: Language;
@@ -42,7 +42,7 @@ export const LanguageProvider = ({ children }: { children: React.ReactNode }) =>
 export const useLanguage = () => {
 	const context = useContext(LanguageContext);
 	if (context === undefined) {
-		throw new Error('No language context found!');
+		throw new Error("No language context found!");
 	}
 	return context;
 };

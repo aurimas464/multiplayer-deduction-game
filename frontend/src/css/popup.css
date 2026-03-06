@@ -57,7 +57,7 @@ body>.popup {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	font-family: 'Cinzel';
+	font-family: "Cinzel";
 }
 
 .popup-minimize,
@@ -201,7 +201,7 @@ body>.popup {
 	height: 100%;
 	width: 100%;
 
-	font-family: 'Spectral', serif;
+	font-family: "Spectral", serif;
 	font-size: 15px;
 
 	-webkit-overflow-scrolling: touch;
@@ -273,7 +273,7 @@ p {
 	font-size: 1.5em;
 	text-align: center;
 	line-height: 2.1em;
-	font-family: 'Cinzel';
+	font-family: "Cinzel";
 }
 
 .code-char.active {
@@ -281,7 +281,7 @@ p {
 }
 
 .code-char.active::after {
-	content: '';
+	content: "";
 	position: absolute;
 	bottom: 0;
 	left: 0;

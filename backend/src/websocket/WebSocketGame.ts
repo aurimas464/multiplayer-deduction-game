@@ -90,7 +90,7 @@ export class WebSocketGame {
 		const iconEtag = await UserService.getIconEtag(playerId);
 
 		await this.ensureSession(code);
-		if (!this.sessions.upsertPlayer(code, seat, username, iconEtag ?? '')) {
+		if (!this.sessions.upsertPlayer(code, seat, username, iconEtag ?? "")) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
 		if (!this.sessions.joinSession(ws, code)) {
@@ -122,7 +122,7 @@ export class WebSocketGame {
 		const iconEtag = await UserService.getIconEtag(playerId);
 
 		await this.ensureSession(current.gameCode);
-		if (!this.sessions.upsertPlayer(current.gameCode, seat, username, iconEtag ?? '')) {
+		if (!this.sessions.upsertPlayer(current.gameCode, seat, username, iconEtag ?? "")) {
 			this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 			return;
 		}

@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { User } from '../types/settings';
-import { authService } from '../services/auth';
-import { colorThemes, languages, themes } from '../types/settings';
-import { setOnUnauthorizedLogout } from '../services/api/api';
-import { useNavigate } from 'react-router-dom';
-import { userService } from '../services/user';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import type { User } from "../types/settings";
+import { authService } from "../services/auth";
+import { colorThemes, languages, themes } from "../types/settings";
+import { setOnUnauthorizedLogout } from "../services/api/api";
+import { useNavigate } from "react-router-dom";
+import { userService } from "../services/user";
 
 type UserContextType = {
 	user: User | null;
@@ -19,7 +19,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 	// Load user from localStorage (may be null if user is not logged in)
 	const [user, setUser] = useState<User | null>(() => {
-		const storedUser = localStorage.getItem('user');
+		const storedUser = localStorage.getItem("user");
 		if (!storedUser) return null;
 
 		try {
@@ -40,7 +40,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 	// Renew user in localStorage on change
 	useEffect(() => {
 		if (!user) {
-			localStorage.removeItem('user');
+			localStorage.removeItem("user");
 			return;
 		}
 
@@ -49,7 +49,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 		const langIdx = languages.indexOf(user.language);
 
 		localStorage.setItem(
-			'user',
+			"user",
 			JSON.stringify({
 				...user,
 				theme: themeIdx === -1 ? 0 : themeIdx,
@@ -112,10 +112,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 	
 	// User cleanup function
 	const cleanupUserData = useCallback(() => {
-		localStorage.removeItem('user');
+		localStorage.removeItem("user");
 		authService.clearAccessToken();
 		setUser(null);
-		navigate('/login', { replace: false });
+		navigate("/login", { replace: false });
 	}, [navigate]);
 
 	// Logout function
@@ -150,7 +150,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 export const useUser = () => {
 	const context = useContext(UserContext);
 	if (context === undefined) {
-		throw new Error('No user context found!');
+		throw new Error("No user context found!");
 	}
 	return context;
 };

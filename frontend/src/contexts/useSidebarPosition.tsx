@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 type SidebarPosition = {
 	right: number;
@@ -13,13 +13,13 @@ export const useSidebarPosition = (): SidebarPosition => {
 
 	useEffect(() => {
 		const updateSidebarPosition = () => {
-			const sidebar = document.querySelector('.sidebar');
+			const sidebar = document.querySelector(".sidebar");
 			if (!sidebar) return;
 
 			const sidebarRect = sidebar.getBoundingClientRect();
-			const isExpanded = sidebar.classList.contains('expanded');
+			const isExpanded = sidebar.classList.contains("expanded");
 
-			// Calculate the right position based on the sidebar's right edge
+			// Calculate the right position based on the sidebar"s right edge
 			const right = sidebarRect.right;
 
 			// Only update if the position has actually changed
@@ -38,11 +38,11 @@ export const useSidebarPosition = (): SidebarPosition => {
 		updateSidebarPosition();
 
 		// Create mutation observer for class changes (expanded/collapsed)
-		const sidebar = document.querySelector('.sidebar');
+		const sidebar = document.querySelector(".sidebar");
 		if (sidebar) {
 			const mutationObserver = new MutationObserver(mutations => {
 				mutations.forEach(mutation => {
-					if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+					if (mutation.type === "attributes" && mutation.attributeName === "class") {
 						// Use requestAnimationFrame for smoother updates
 						requestAnimationFrame(updateSidebarPosition);
 					}
@@ -54,7 +54,7 @@ export const useSidebarPosition = (): SidebarPosition => {
 			const handleResize = () => {
 				requestAnimationFrame(updateSidebarPosition);
 			};
-			window.addEventListener('resize', handleResize);
+			window.addEventListener("resize", handleResize);
 
 			const intervalId = setInterval(() => {
 				requestAnimationFrame(updateSidebarPosition);
@@ -64,7 +64,7 @@ export const useSidebarPosition = (): SidebarPosition => {
 			// Clean up
 			return () => {
 				mutationObserver.disconnect();
-				window.removeEventListener('resize', handleResize);
+				window.removeEventListener("resize", handleResize);
 				clearInterval(intervalId);
 			};
 		}

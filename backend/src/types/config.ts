@@ -1,7 +1,7 @@
 export type CookieConfig = {
 	httpOnly: boolean;
 	secure: boolean;
-	sameSite: 'strict' | 'lax' | 'none';
+	sameSite: "strict" | "lax" | "none";
 	domain: string;
 	maxAgeDays: number;
 }

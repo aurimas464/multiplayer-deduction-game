@@ -1,8 +1,8 @@
-import axios from 'axios';
-import { tokenSession } from './tokenSession';
-import { authService } from '../auth';
+import axios from "axios";
+import { tokenSession } from "./tokenSession";
+import { authService } from "../auth";
 
-declare module 'axios' {
+declare module "axios" {
 	export interface InternalAxiosRequestConfig {
 		_retry?: boolean;
 	}
@@ -46,13 +46,13 @@ export const setOnUnauthorizedLogout = (handler: () => void) => {
 
 const getPath = (url?: string) => {
 	try {
-		return new URL(url ?? '', api.defaults.baseURL).pathname;
+		return new URL(url ?? "", api.defaults.baseURL).pathname;
 	} catch {
-		return url ?? '';
+		return url ?? "";
 	}
 };
-const isAuthUrl = (url?: string) => getPath(url).includes('/auth/');
-const isRefreshUrl = (url?: string) => getPath(url).endsWith('/auth/refresh');
+const isAuthUrl = (url?: string) => getPath(url).includes("/auth/");
+const isRefreshUrl = (url?: string) => getPath(url).endsWith("/auth/refresh");
 
 const forceLogout = () => {
 	if (didLogout) return;

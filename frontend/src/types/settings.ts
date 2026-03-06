@@ -1,10 +1,10 @@
-export const themes = ['dark', 'light'] as const;
+export const themes = ["dark", "light"] as const;
 export type Theme = (typeof themes)[number];
 
-export const colorThemes = ['red', 'blue', 'purple', 'gold'] as const;
+export const colorThemes = ["red", "blue", "purple", "gold"] as const;
 export type ColorTheme = (typeof colorThemes)[number];
 
-export const languages = ['en', 'lt'] as const;
+export const languages = ["en", "lt"] as const;
 export type Language = (typeof languages)[number];
 
 export type User = {

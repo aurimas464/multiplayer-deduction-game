@@ -1,14 +1,14 @@
-import type { ApiResponse } from '../types';
-import { apiRequest } from './api/apiRequest';
-import type { UserSettings } from '../types/settings';
-import api from './api/api';
-import type { User } from '../types/settings';
+import type { ApiResponse } from "../types";
+import { apiRequest } from "./api/apiRequest";
+import type { UserSettings } from "../types/settings";
+import api from "./api/api";
+import type { User } from "../types/settings";
 
 export const userService = {
 	async getMe(): Promise<ApiResponse<User>> {
 		const res = await apiRequest<User>(api, {
-			method: 'GET',
-			url: '/user/getme'
+			method: "GET",
+			url: "/user/getme"
 		});
 
 		return res;
@@ -16,8 +16,8 @@ export const userService = {
 
 	async saveSettings(data: UserSettings): Promise<ApiResponse<User>> {
 		const res = await apiRequest<User>(api, {
-			method: 'PATCH',
-			url: '/user/update',
+			method: "PATCH",
+			url: "/user/update",
 			data: {
 				theme: data.theme,
 				colorTheme: data.colorTheme,

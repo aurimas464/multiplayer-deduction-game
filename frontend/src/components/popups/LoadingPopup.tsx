@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
-import Popup from './Popup';
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
-import type { PopupData } from '../../types/popup';
+import { useEffect, useRef } from "react";
+import Popup from "./Popup";
+import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import type { PopupData } from "../../types/popup";
 
 type Props = {
-	popup: PopupData<'loading'>;
+	popup: PopupData<"loading">;
 	onClose: () => void;
 };
 

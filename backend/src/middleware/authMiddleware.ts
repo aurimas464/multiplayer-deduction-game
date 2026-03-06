@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import config from '../config';
-import { AppError, ErrorCode } from '../types';
-import type { JwtPayload } from '../types/config';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import config from "../config";
+import { AppError, ErrorCode } from "../types";
+import type { JwtPayload } from "../types/config";
 
 declare global {
 	namespace Express {
@@ -15,16 +15,16 @@ declare global {
 export const authenticateToken = (req: Request, _res: Response, next: NextFunction): void => {
 	const authHeader = req.headers.authorization;
 
-	if (!authHeader || !authHeader.startsWith('Bearer ')) {
+	if (!authHeader || !authHeader.startsWith("Bearer ")) {
 		throw new AppError(ErrorCode.UNAUTHORIZED);
 	}
 
-	const token = authHeader.slice('Bearer '.length).trim();
+	const token = authHeader.slice("Bearer ".length).trim();
 
 	try {
-		const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
+		const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ["HS256"] });
 
-		if (typeof decoded !== 'object' || decoded === null) {
+		if (typeof decoded !== "object" || decoded === null) {
 			throw new AppError(ErrorCode.UNAUTHORIZED);
 		}
 
@@ -41,7 +41,7 @@ export const authenticateToken = (req: Request, _res: Response, next: NextFuncti
 export const validateRefreshToken = (req: Request, _res: Response, next: NextFunction): void => {
 	const refreshToken = req.cookies?.refreshToken;
 
-	if (!refreshToken || typeof refreshToken !== 'string') {
+	if (!refreshToken || typeof refreshToken !== "string") {
 		throw new AppError(ErrorCode.MISSING_REFRESH_TOKEN);
 	}
 

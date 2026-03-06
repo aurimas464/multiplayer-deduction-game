@@ -1,20 +1,20 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { type Theme, type ColorTheme, type Language, themes, colorThemes, languages, type User, type UserSettings } from '../../types/settings';
-import { userService } from '../../services/user';
-import { useUser } from '../../contexts/UserContext';
-import { useTranslation } from '../../contexts/useTranslation';
-import { usePopup } from '../../contexts/PopupContext';
-import { errorMapper } from '../../utils/errorMapper';
-import defaultIcon from '../../assets/default-user-icon.png';
-import { Tooltip } from '../Tooltip';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "../../contexts/ThemeContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { type Theme, type ColorTheme, type Language, themes, colorThemes, languages, type User, type UserSettings } from "../../types/settings";
+import { userService } from "../../services/user";
+import { useUser } from "../../contexts/UserContext";
+import { useTranslation } from "../../contexts/useTranslation";
+import { usePopup } from "../../contexts/PopupContext";
+import { errorMapper } from "../../utils/errorMapper";
+import defaultIcon from "../../assets/default-user-icon.png";
+import { Tooltip } from "../Tooltip";
 
 const ALLOWED_MIME_TYPES = [
-	'image/png',
-	'image/jpeg',
-	'image/gif',
-	'image/webp',
+	"image/png",
+	"image/jpeg",
+	"image/gif",
+	"image/webp",
 ] as const;
 
 const Settings = () => {
@@ -28,7 +28,7 @@ const Settings = () => {
 		theme: u?.theme ?? themes[0],
 		colorTheme: u?.colorTheme ?? colorThemes[0],
 		language: u?.language ?? languages[0],
-		icon: u?.player.icon ?? '',
+		icon: u?.player.icon ?? "",
 	});
 
 	const [currentSettings, setCurrentSettings] = useState<UserSettings>(() =>
@@ -39,7 +39,7 @@ const Settings = () => {
 		makeSettingsFromUser(user ?? null)
 	);
 
-	const [iconPreviewUrl, setIconPreviewUrl] = useState<string>(() => (user?.player.icon ?? ''));
+	const [iconPreviewUrl, setIconPreviewUrl] = useState<string>(() => (user?.player.icon ?? ""));
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 	const resolvedPreviewUrl = useMemo(() => {
@@ -71,7 +71,7 @@ const Settings = () => {
 
 	const resetFileInput = () => {
 		if (!fileInputRef.current) return;
-		fileInputRef.current.value = '';
+		fileInputRef.current.value = "";
 	};
 
 	const revertContextToOriginal = () => {
@@ -79,7 +79,7 @@ const Settings = () => {
 		setTheme(orig.theme);
 		setColorTheme(orig.colorTheme);
 		setLanguage(orig.language);
-		setIconPreviewUrl(orig.icon || '');
+		setIconPreviewUrl(orig.icon || "");
 		resetFileInput();
 	};
 
@@ -91,7 +91,7 @@ const Settings = () => {
 		setCurrentSettings(next);
 		originalSettingsRef.current = next;
 
-		setIconPreviewUrl(next.icon || '');
+		setIconPreviewUrl(next.icon || "");
 		resetFileInput();
 	}, [user]);
 
@@ -133,7 +133,7 @@ const Settings = () => {
 	const fileToDataUrl = (file: File) => {
 		return new Promise<string>((resolve, reject) => {
 			const reader = new FileReader();
-			reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+			reader.onerror = () => reject(new Error("FILE_READ_FAILED"));
 			reader.onload = () => resolve(String(reader.result));
 			reader.readAsDataURL(file);
 		});
@@ -145,9 +145,9 @@ const Settings = () => {
 
 		if (!ALLOWED_MIME_TYPES.includes(file.type as (typeof ALLOWED_MIME_TYPES)[number])) {
 			showPopup({
-				type: 'error',
-				title: t('common.error'),
-				payload: { message: t('components.sidebar.settings.iconUpload.invalidType') },
+				type: "error",
+				title: t("common.error"),
+				payload: { message: t("components.sidebar.settings.iconUpload.invalidType") },
 				autoCloseDelay: 5000,
 			});
 			resetFileInput();
@@ -161,9 +161,9 @@ const Settings = () => {
 			setCurrentSettings({ ...currentSettings, icon: dataUrl });
 		} catch {
 			showPopup({
-				type: 'error',
-				title: t('common.error'),
-				payload: { message: t('components.sidebar.settings.iconUpload.readFailed') },
+				type: "error",
+				title: t("common.error"),
+				payload: { message: t("components.sidebar.settings.iconUpload.readFailed") },
 				autoCloseDelay: 5000,
 			});
 		} finally {
@@ -175,8 +175,8 @@ const Settings = () => {
 		const settingsToSave: UserSettings = { ...currentSettings };
 
 		const loadingId = showPopup({
-			type: 'loading',
-			title: t('common.loading'),
+			type: "loading",
+			title: t("common.loading"),
 			payload: {},
 		});
 		const response = await userService.saveSettings(settingsToSave);
@@ -202,9 +202,9 @@ const Settings = () => {
 			}
 
 			showPopup({
-				type: 'success',
-				title: t('common.success'),
-				payload: { message: t('components.sidebar.settings.saveSuccessMessage') },
+				type: "success",
+				title: t("common.success"),
+				payload: { message: t("components.sidebar.settings.saveSuccessMessage") },
 				autoCloseDelay: 5000,
 			});
 		} else {
@@ -214,8 +214,8 @@ const Settings = () => {
 			const code = response.errors[0].code;
 			const errorMessage = errorMapper(code, t, language);
 			showPopup({
-				type: 'error',
-				title: t('common.error'),
+				type: "error",
+				title: t("common.error"),
 				payload: { message: errorMessage },
 				autoCloseDelay: 5000,
 			});
@@ -225,10 +225,10 @@ const Settings = () => {
 	return (
 		<div className="container">
 			<div className="settings-container">
-				<h2>{t('components.sidebar.settings.header')}</h2>
+				<h2>{t("components.sidebar.settings.header")}</h2>
 
 				<div>
-					<h4>{t('components.sidebar.settings.languages')}</h4>
+					<h4>{t("components.sidebar.settings.languages")}</h4>
 					<div className="form-group">
 						<select
 							className="settings-dropdown"
@@ -236,17 +236,17 @@ const Settings = () => {
 							onChange={handleLanguageChange}
 						>
 							<option value="en">
-								{t('components.sidebar.settings.languageSelect.english')}
+								{t("components.sidebar.settings.languageSelect.english")}
 							</option>
 							<option value="lt">
-								{t('components.sidebar.settings.languageSelect.lithuanian')}
+								{t("components.sidebar.settings.languageSelect.lithuanian")}
 							</option>
 						</select>
 					</div>
 				</div>
 
 				<div>
-					<h4>{t('components.sidebar.settings.themes')}</h4>
+					<h4>{t("components.sidebar.settings.themes")}</h4>
 					<div className="form-group">
 						<select
 							className="settings-dropdown"
@@ -254,17 +254,17 @@ const Settings = () => {
 							onChange={handleThemeChange}
 						>
 							<option value="light">
-								{t('components.sidebar.settings.themeSelect.light')}
+								{t("components.sidebar.settings.themeSelect.light")}
 							</option>
 							<option value="dark">
-								{t('components.sidebar.settings.themeSelect.dark')}
+								{t("components.sidebar.settings.themeSelect.dark")}
 							</option>
 						</select>
 					</div>
 				</div>
 
 				<div>
-					<h4>{t('components.sidebar.settings.colorThemes')}</h4>
+					<h4>{t("components.sidebar.settings.colorThemes")}</h4>
 					<div className="form-group">
 						<select
 							className="settings-dropdown"
@@ -272,28 +272,28 @@ const Settings = () => {
 							onChange={handleColorThemeChange}
 						>
 							<option value="red">
-								{t('components.sidebar.settings.colorThemeSelect.red')}
+								{t("components.sidebar.settings.colorThemeSelect.red")}
 							</option>
 							<option value="blue">
-								{t('components.sidebar.settings.colorThemeSelect.blue')}
+								{t("components.sidebar.settings.colorThemeSelect.blue")}
 							</option>
 							<option value="purple">
-								{t('components.sidebar.settings.colorThemeSelect.purple')}
+								{t("components.sidebar.settings.colorThemeSelect.purple")}
 							</option>
 							<option value="gold">
-								{t('components.sidebar.settings.colorThemeSelect.gold')}
+								{t("components.sidebar.settings.colorThemeSelect.gold")}
 							</option>
 						</select>
 					</div>
 				</div>
 
 				<div>
-					<h4>{t('components.sidebar.settings.icon')}</h4>
+					<h4>{t("components.sidebar.settings.icon")}</h4>
 
 					<div className="form-group">
 						<Tooltip
 							key="icon-picker"
-							content={t('components.sidebar.settings.iconPicker')}
+							content={t("components.sidebar.settings.iconPicker")}
 							position="right"
 							showDelay={500}
 						>
@@ -323,7 +323,7 @@ const Settings = () => {
 
 			<div className="sidebar-footer">
 				<button className="button" onClick={handleSaveClick}>
-					{t('common.save')}
+					{t("common.save")}
 				</button>
 			</div>
 		</div>
