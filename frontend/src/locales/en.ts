@@ -9,6 +9,8 @@ export const en = {
 		loading: "Loading...",
 		networkError: "Network error. Please check your connection.",
 		timeoutError: "Request timeout. Please try again later.",
+		on: "On",
+		off: "Off"
 	},
 	pages: {
 		login: {
@@ -44,17 +46,30 @@ export const en = {
 		gameLobby: {
 			gameRoomNotFound: "Game room not found",
 			code: "Game code",
-			players: "Players",
-			settings: "Settings",
 			ready: "Ready",
 			leave: "Leave",
-
-			changeSeat: "Change seat",
-			leader: "Leader",
-			notReady: "Not ready",
-			emptySeat: "Empty seat",
-			maxPlayers: "Max players",
 			unready: "Unready",
+			players: "Players",
+			settings: {
+				title: "Settings",
+				maxPlayers: "Max players in lobby",
+				minPlayers: "Min players before start",
+				dayTime: "Day time",
+				votingTime: "Voting time",
+				nightTime: "Night time",
+				tieBehavior: "Tie Behavior",
+				voteVisibility: "Vote visibility",
+				dropdown: {
+					noOneDies: "No one dies",
+					randomTied: "Random among tied",
+					revote: "Revote",
+					never: "Never",
+					end: "End of voting",
+					live: "Live"
+				},
+				anonymousVoting: "Anonymous voting",
+				roleReveal: "Role reveal on death"
+			}
 		}
 	},
 	components: {

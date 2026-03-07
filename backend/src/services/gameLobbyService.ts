@@ -3,11 +3,13 @@ import { AppError, ErrorCode } from "../types";
 import { GameModelTransaction } from "../models/game";
 import { SeatModelTransaction } from "../models/seat";
 import { Seat } from "../types/entities/seat";
-import prisma from "../prisma";
-import { Game } from "../types/entities/game";
+import prisma from "../prisma";	
+import { MetaSettings } from "../types/websocket";
 
 const MAX_LOBBY_SIZE = 20;
 const MIN_LOBBY_SIZE = 5;
+const MIN_PERIOD_SECONDS = 10;
+const MAX_PERIOD_SECONDS = 999;
 
 class GameLobbyService {
 
@@ -94,7 +96,7 @@ class GameLobbyService {
 		});
 	}
 
-	public async changeLobbySize(playerId: number, gameCode: string, maxPlayers: number): Promise<Game> {
+	public async updateLobbySettings(playerId: number, gameCode: string, metaSettings: Partial<MetaSettings>): Promise<boolean> {
 		const code = gameCode.trim();
 
 		return prisma.$transaction(async (tx) => {
@@ -104,35 +106,58 @@ class GameLobbyService {
 			if (!lobby) {
 				throw new AppError(ErrorCode.GAME_NOT_FOUND);
 			}
-
-			const locked = await gamesModel.lockGameForSeatMutation(lobby.id);
-			if (!locked) {
-				throw new AppError(ErrorCode.GAME_NOT_FOUND);
+			if (lobby.gameCode !== code) {
+				throw new AppError(ErrorCode.NOT_IN_LOBBY);
 			}
-			if (locked.status !== "lobby") {
+			if (lobby.status !== "lobby") {
 				throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
 			}
 
-			const inLobby = await tx.seat.findFirst({
-				where: { gameId: locked.id, playerId },
-				select: { playerId: true },
-			});
-			if (!inLobby) {
-				throw new AppError(ErrorCode.NOT_IN_LOBBY);
+			const mySeat = lobby.seats.find((s) => s.playerId === playerId);
+			if (!mySeat || mySeat.number !== 1) {
+				throw new AppError(ErrorCode.NOT_GAME_LEADER);
 			}
 
-			if (maxPlayers < MIN_LOBBY_SIZE || maxPlayers > MAX_LOBBY_SIZE) {
+			if (metaSettings.maxPlayers !== undefined && (metaSettings.maxPlayers < MIN_LOBBY_SIZE || metaSettings.maxPlayers > MAX_LOBBY_SIZE)) {
 				throw new AppError(ErrorCode.INVALID_REQUEST);
 			}
 
-			const violating = await tx.seat.count({
-				where: { gameId: locked.id, number: { gt: maxPlayers } },
-			});
-			if (violating > 0) {
-				throw new AppError(ErrorCode.LOBBY_TOO_SMALL);
+			if (metaSettings.minPlayers !== undefined && (metaSettings.minPlayers < MIN_LOBBY_SIZE || metaSettings.minPlayers > (metaSettings.maxPlayers ?? lobby.maxPlayers))) {
+				throw new AppError(ErrorCode.INVALID_REQUEST);
 			}
 
-			return gamesModel.updateMaxPlayers(locked.id, maxPlayers);
+			if (metaSettings.daySeconds !== undefined && (metaSettings.daySeconds < MIN_PERIOD_SECONDS || metaSettings.daySeconds > MAX_PERIOD_SECONDS)) {
+				throw new AppError(ErrorCode.INVALID_REQUEST);
+			}
+
+			if (metaSettings.votingSeconds !== undefined && (metaSettings.votingSeconds < MIN_PERIOD_SECONDS || metaSettings.votingSeconds > MAX_PERIOD_SECONDS)) {
+				throw new AppError(ErrorCode.INVALID_REQUEST);
+			}
+
+			if (metaSettings.nightSeconds !== undefined && (metaSettings.nightSeconds < MIN_PERIOD_SECONDS || metaSettings.nightSeconds > MAX_PERIOD_SECONDS)) {
+				throw new AppError(ErrorCode.INVALID_REQUEST);
+			}
+
+			if (metaSettings.maxPlayers !== undefined) {
+				const locked = await gamesModel.lockGameForSeatMutation(lobby.id);
+				if (!locked) {
+					throw new AppError(ErrorCode.GAME_NOT_FOUND);
+				}
+				if (locked.status !== "lobby") {
+					throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
+				}
+
+				const seatsModel = SeatModelTransaction(tx);
+				const occupied = await seatsModel.listOccupied(locked.id);
+
+				for (const number of occupied) {
+					if (number > metaSettings.maxPlayers) {
+						throw new AppError(ErrorCode.LOBBY_TOO_SMALL);
+					}
+				}
+			}
+
+			return gamesModel.update(lobby.id, metaSettings);
 		});
 	}
 }

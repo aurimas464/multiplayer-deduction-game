@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet } from "react-router-dom";
-import { useTranslation } from "../contexts/useTranslation";
+import { useTranslation } from "../hooks/useTranslation";
 import { ChatBubbleLeftRightIcon, UserGroupIcon, DocumentTextIcon, Cog6ToothIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import Settings from "./sidebar/Settings";
 import { Tooltip } from "../components/Tooltip";

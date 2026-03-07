@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
-import { usePopup } from "./PopupContext";
+import { usePopup } from "../contexts/PopupContext";
 import { useTranslation } from "./useTranslation";
-import { useWebSocket } from "./WebSocketContext";
+import { useWebSocket } from "../contexts/WebSocketContext";
 import type { ClientMessage, ServerMessage } from "../types/websocket";
 
 type NotifyOptions = {

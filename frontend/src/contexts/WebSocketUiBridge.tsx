@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useWebSocket } from "./WebSocketContext";
 import { usePopup } from "./PopupContext";
-import { useTranslation } from "./useTranslation";
+import { useTranslation } from "../hooks/useTranslation";
 import { useLanguage } from "./LanguageContext";
 import { ErrorCode } from "../types";
 import { errorMapper } from "../utils/errorMapper";

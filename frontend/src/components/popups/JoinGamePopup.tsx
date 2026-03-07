@@ -2,9 +2,9 @@ import Popup from "./Popup";
 import { useRef, useState } from "react";
 import { UserGroupIcon } from "@heroicons/react/24/outline";
 import type { PopupData } from "../../types/popup";
-import { useTranslation } from "../../contexts/useTranslation";
+import { useTranslation } from "../../hooks/useTranslation";
 import { useNavigate } from "react-router-dom";
-import { useWebSocketNotifyWithLoading } from "../../contexts/useWebSocketNotifyWithLoading";
+import { useWebSocketNotifyWithLoading } from "../../hooks/useWebSocketNotifyWithLoading";
 import { ErrorCode } from "../../types";
 import "../../css/Home.css";
 
@@ -175,7 +175,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 				</div>
 
 				<button
-					className="button"
+					className="custom-button"
 					onClick={handleSubmit}
 					disabled={gameCode.trim().length !== 6 || isJoining}
 				>

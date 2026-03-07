@@ -1,5 +1,5 @@
 import type { PopupPosition } from "../../types/popup";
-import { useSidebarPosition } from "../../contexts/useSidebarPosition";
+import { useSidebarPosition } from "../../hooks/useSidebarPosition";
 import { usePopup } from "../../contexts/PopupContext";
 import { Rnd } from "react-rnd";
 import React, { useEffect, useRef, useState, useCallback } from "react";

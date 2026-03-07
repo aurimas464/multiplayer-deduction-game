@@ -9,7 +9,7 @@
 .lobby-container {
 	width: 100%;
 	max-width: 1000px;
-	height: min(90vh, 750px);
+	height: min(90vh, 900px);
 	min-height: 0;
 	display: grid;
 	grid-template-rows: auto 1fr;
@@ -58,33 +58,18 @@
 	gap: 1rem;
 }
 
-.left-section {
+.section-grid {
 	min-height: 300px;
 	display: grid;
-	grid-template-rows: 4fr 1fr;
+	grid-template-rows: 5fr 1fr;
 	gap: 1rem;
 }
 
-.settings-section {
-	min-height: 0;
-	display: grid;
-	grid-template-rows: 4fr 1fr;
-	gap: 1rem;
-}
-
-.players-section {
+.section-flex {
 	min-height: 0;
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-}
-
-.right-section {
-	min-height: 0;
-	overflow: auto;
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
 }
 
 .players-seats {
@@ -193,4 +178,37 @@
 	.lobby-content-layout {
 		grid-template-columns: 1fr;
 	}
+}
+
+.settings-options {
+	display: flex;
+	flex-direction: column;
+	padding: 0.5rem;
+	overflow-y: auto;
+}
+
+.settings-row {
+	display: flex;
+	flex-wrap: wrap;
+	flex-direction: row;
+	gap: 1rem;
+	padding: 0.5rem;
+	align-items: center;
+	justify-content: center;
+}
+
+.setting-card {
+	min-width: 125px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.setting-label {
+	font-family: "Cinzel";
+	font-weight: 700;
+	font-size: 0.8rem;
+	white-space: nowrap;
+	text-transform: uppercase;
 }

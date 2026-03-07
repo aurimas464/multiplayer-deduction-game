@@ -1,34 +1,6 @@
-import type { ConnectedUserSocket, LobbyStateData } from "../types/websocket";
+import type { ConnectedUserSocket, LobbyStateData, GameSession } from "../types/websocket";
 import type { Seat } from "../types/entities/seat";
-
-export type SessionPlayer = {
-	type: "user" | "bot";
-	playerId: number;
-	username: string;
-	isReady: boolean;
-	seatNr: number;
-	iconEtag: string;
-
-	joinedAt: number;
-
-	isOnline: boolean;
-	lastSeenAt: number;
-};
-
-
-export type GameSession = {
-	gameCode: string;
-
-	sockets: Set<ConnectedUserSocket>;
-	players: Map<number, SessionPlayer>;
-	userSocketCounts: Map<number, number>;
-	createdAt: number;
-	lastActiveAt: number;
-	emptySince?: number;
-
-	maxPlayers: number;
-	minPlayers: number;
-};
+import type { MetaSettings, RoleSettings, SessionPlayer } from "../types/websocket";
 
 type LobbyChangedFn = (gameCode: string) => void;
 
@@ -62,7 +34,7 @@ export class WebSocketGameSession {
 		else session.userSocketCounts.set(playerId, next);
 		return next;
 	}
-	
+
 	public start(): void {
 		if (this.timer) return;
 
@@ -77,19 +49,11 @@ export class WebSocketGameSession {
 					session.emptySince = now;
 				}
 
-				let changed = false;
-
 				// Cleanup stale/empty sessions
 				const emptyTooLong = session.emptySince ? now - session.emptySince > this.cleanupIntervalMs * 5 : false;
 				const staleTooLong = now - session.lastActiveAt > this.staleSessionMs;
-
 				if (emptyTooLong || staleTooLong) {
 					this.sessions.delete(code);
-					continue;
-				}
-
-				if (changed) {
-					this.notify(code);
 				}
 			}
 		}, this.cleanupIntervalMs);
@@ -107,19 +71,19 @@ export class WebSocketGameSession {
 		return this.sessions.get(gameCode);
 	}
 
-	public create(gameCode: string, maxPlayers: number, minPlayers: number): GameSession {
+	public create(gameCode: string, metaSettings: MetaSettings, roleSettings: RoleSettings): GameSession {
 		const existing = this.sessions.get(gameCode);
 		if (existing) {
-			existing.maxPlayers = maxPlayers;
-			existing.minPlayers = minPlayers;
+			existing.metaSettings = { ...metaSettings };
+			existing.roleSettings = { ...roleSettings };
 			return existing;
 		}
 
 		const now = Date.now();
 		const session: GameSession = {
 			gameCode,
-			maxPlayers,
-			minPlayers,
+			metaSettings,
+			roleSettings,
 			sockets: new Set(),
 			players: new Map(),
 			userSocketCounts: new Map(),
@@ -230,16 +194,17 @@ export class WebSocketGameSession {
 			player.lastSeenAt = now;
 			session.lastActiveAt = now;
 
+			let isOnline = true;
 			if (type === "user") {
 				const count = session.userSocketCounts.get(seat.playerId) ?? 0;
-				player.isOnline = count > 0;
-			} else {
-				player.isOnline = true;
+				isOnline = count > 0;
 			}
+			player.isOnline = isOnline;
 		} else {
 			let isOnline = true;
-			if(type === "user") {
-				isOnline = (session.userSocketCounts.get(seat.playerId) ?? 0) > 0;
+			if (type === "user") {
+				const count = session.userSocketCounts.get(seat.playerId) ?? 0;
+				isOnline = count > 0;
 			}
 
 			player = {
@@ -262,11 +227,30 @@ export class WebSocketGameSession {
 		return player;
 	}
 
-	public setMaxPlayers(gameCode: string, maxPlayers: number): boolean {
+	public updateMetaSettings(gameCode: string, patch: Partial<MetaSettings>): boolean {
 		const session = this.sessions.get(gameCode);
 		if (!session) return false;
 
-		session.maxPlayers = maxPlayers;
+		session.metaSettings = {
+			...session.metaSettings,
+			...patch,
+		};
+
+		session.lastActiveAt = Date.now();
+		this.notify(gameCode);
+		return true;
+	}
+
+	public updateRoleSettings(gameCode: string, patch: Partial<RoleSettings>): boolean {
+		const session = this.sessions.get(gameCode);
+		if (!session) return false;
+
+		/*
+		session.roleSettings = {
+			...session.roleSettings,
+			...patch,
+		};*/
+
 		session.lastActiveAt = Date.now();
 		this.notify(gameCode);
 		return true;
@@ -289,8 +273,6 @@ export class WebSocketGameSession {
 	public removePlayer(gameCode: string, playerId: number): boolean {
 		const session = this.sessions.get(gameCode);
 		if (!session) return false;
-
-		const player = session.players.get(playerId);
 
 		session.players.delete(playerId);
 		session.userSocketCounts.delete(playerId);
@@ -325,10 +307,8 @@ export class WebSocketGameSession {
 		const session = this.sessions.get(gameCode);
 		if (!session) return null;
 
-		const players: LobbyStateData["players"] = [];
-
-		for (const p of session.players.values()) {
-			players.push({
+		const snapshot: LobbyStateData = {
+			players: Array.from(session.players.values()).map((p) => ({
 				playerId: p.playerId,
 				username: p.username,
 				iconEtag: p.iconEtag,
@@ -336,15 +316,13 @@ export class WebSocketGameSession {
 				isOnline: p.isOnline,
 				lastSeenAt: p.lastSeenAt,
 				seatNr: p.seatNr,
-			});
-		}
-
-		players.sort((a, b) => a.seatNr - b.seatNr);
-
-		return {
-			players,
-			maxPlayers: session.maxPlayers,
-			minPlayers: session.minPlayers,
+			})),
+			metaSettings: { ...session.metaSettings },
+			roleSettings: { ...session.roleSettings },
 		};
+
+		snapshot.players.sort((a, b) => a.seatNr - b.seatNr);
+
+		return snapshot;
 	}
 }

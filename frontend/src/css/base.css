@@ -166,7 +166,8 @@
 	text-align: center;
 }
 
-.settings-dropdown {
+.custom-dropdown {
+	font-family: "Spectral";
 	width: 100%;
 	padding: 0.5rem;
 	background-color: var(--bg-primary);
@@ -181,16 +182,16 @@
 	-moz-appearance: none;
 }
 
-.settings-dropdown::-ms-expand {
+.custom-dropdown::-ms-expand {
 	display: none;
 }
 
-.settings-dropdown:focus {
+.custom-dropdown:focus {
 	outline: none;
 	box-shadow: none;
 }
 
-.button {
+.custom-button {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -209,17 +210,86 @@
 	z-index: 102;
 }
 
-.button:hover {
+.custom-button.small_button{
+	height: 1.5rem;
+	width: 4rem;
+}
+
+.custom-button:hover {
 	background-color: var(--hover-gray);
 }
 
-.button[disabled] {
+.custom-button[disabled] {
 	opacity: 0.5;
 	cursor: not-allowed;
 	color: var(--text-primary);
 	background-color: var(--bg-secondary);
 	pointer-events: none;
 }
+
+.custom-input-stepper {
+	display: flex;
+	align-items: stretch;
+	border-radius: 25px;
+	overflow: hidden;
+	transition: transform 0.2s ease;
+}
+
+.custom-input-stepper:hover,
+.custom-input-stepper:focus-within {
+	transform: scale(1.05);
+}
+
+.custom-input-stepper .input {
+	width: 35px;
+	background: var(--bg-secondary);
+	color: var(--text-primary);
+	border: none;
+	outline: none;
+	text-align: center;
+	font-size: 15px;
+	font-family: inherit;
+}
+
+.custom-input-stepper .input::-webkit-inner-spin-button,
+.custom-input-stepper .input::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.custom-input-stepper .input[type="number"] {
+	-moz-appearance: textfield;
+	appearance: textfield;
+}
+
+.custom-input-stepper .input-controls {
+	display: flex;
+	flex-direction: column;
+	width: 25px;
+}
+
+.custom-input-stepper .custom-input-button {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--accent-primary-light);
+	color: var(--bg-primary);
+	border: none;
+	cursor: pointer;
+	font-size: 10px;
+	line-height: 1;
+	transition: background 0.2s ease;
+}
+
+.custom-input-stepper .custom-input-button:hover {
+	background: var(--accent-primary);
+}
+
+.custom-input-stepper .custom-input-button:active {
+	background: var(--accent-primary-dark);
+}
+
 
 .icon-picker {
 	display: flex;

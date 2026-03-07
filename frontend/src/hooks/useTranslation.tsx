@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { Language } from "../types/settings";
 import { translations } from "../locales";
-import { useLanguage } from "./LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 
 // Resolve nested translation from  translations object
 const getNestedValue = (language_obj: any, path: string) => {

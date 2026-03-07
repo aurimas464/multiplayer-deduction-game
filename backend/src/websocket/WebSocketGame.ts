@@ -1,5 +1,5 @@
 import { AppError, ErrorCode } from "../types";
-import type { ConnectedUserSocket, ClientMessage, ServerMessage } from "../types/websocket";
+import type { ConnectedUserSocket, ClientMessage, ServerMessage, MetaSettings, RoleSettings } from "../types/websocket";
 import { WebSocketGameSession } from "./WebSocketGameSession";
 import GameService from "../services/gameService";
 import UserService from "../services/userService";
@@ -21,7 +21,17 @@ export class WebSocketGame {
 		if (!lobby) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
-		return this.sessions.create(gameCode, lobby.maxPlayers, lobby.minPlayers);
+			return this.sessions.create(gameCode, {
+				maxPlayers: lobby.maxPlayers,
+				minPlayers: lobby.minPlayers,
+				daySeconds: lobby.daySeconds,
+				votingSeconds: lobby.votingSeconds,
+				nightSeconds: lobby.nightSeconds,
+				tieBehavior: lobby.tieBehavior,
+				voteCountVisibility: lobby.voteCountVisibility,
+				anonymousVoting: lobby.anonymousVoting,
+				roleRevealOnDeath: lobby.roleRevealOnDeath,
+			}, {});
 	}
 
 	public track(ws: ConnectedUserSocket): void {
@@ -65,13 +75,27 @@ export class WebSocketGame {
 			case "SET_READY":
 				await this.onSetReady(ws, msg.ready);
 				return;
+
+			case "UPDATE_LOBBY_SETTINGS":
+				await this.onUpdateLobbySettings(ws, msg.metaSettings, msg.roleSettings);
+				return;
 		}
 	}
 
 	private async onCreateGame(ws: ConnectedUserSocket): Promise<void> {
 		const created = await GameService.createGame();
 		if (created) {
-			this.sessions.create(created.gameCode, created.maxPlayers, created.minPlayers);
+			this.sessions.create(created.gameCode, {
+				maxPlayers: created.maxPlayers,
+				minPlayers: created.minPlayers,
+				daySeconds: created.daySeconds,
+				votingSeconds: created.votingSeconds,
+				nightSeconds: created.nightSeconds,
+				tieBehavior: created.tieBehavior,
+				voteCountVisibility: created.voteCountVisibility,
+				anonymousVoting: created.anonymousVoting,
+				roleRevealOnDeath: created.roleRevealOnDeath,
+			}, {});
 			this.sendMessage(ws, { type: "CREATE_GAME_OK", gameCode: created.gameCode } as ServerMessage);
 		} else {
 			throw new AppError(ErrorCode.GAME_NOT_CREATED);
@@ -231,5 +255,29 @@ export class WebSocketGame {
 		}
 
 		this.sendMessage(ws, { type: "SET_READY_OK" });
+	}
+
+	private async onUpdateLobbySettings(ws: ConnectedUserSocket, metaSettings: Partial<MetaSettings>, roleSettings: Partial<RoleSettings>): Promise<void> {
+		const playerId = ws.userToken?.playerId;
+		if (!playerId) {
+			throw new AppError(ErrorCode.UNAUTHORIZED);
+		}
+		const code = ws.gameCode;
+		if (!code) {
+			throw new AppError(ErrorCode.NOT_IN_LOBBY);
+		}
+
+		const updated = await GameLobbyService.updateLobbySettings(playerId, code, metaSettings);
+		if (!updated) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+
+		await this.ensureSession(code);
+
+		if (!this.sessions.updateMetaSettings(code, metaSettings)) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+
+		this.sendMessage(ws, { type: "UPDATE_LOBBY_SETTINGS_OK" });
 	}
 }

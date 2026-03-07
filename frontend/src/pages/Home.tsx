@@ -2,9 +2,9 @@ import { ArrowRightStartOnRectangleIcon, PlayIcon, TrophyIcon, UserGroupIcon } f
 import { useNavigate } from "react-router-dom";
 import { useRef } from "react";
 import { useUser } from "../contexts/UserContext";
-import { useTranslation } from "../contexts/useTranslation";
+import { useTranslation } from "../hooks/useTranslation";
 import { usePopup } from "../contexts/PopupContext";
-import { useWebSocketNotifyWithLoading } from "../contexts/useWebSocketNotifyWithLoading";
+import { useWebSocketNotifyWithLoading } from "../hooks/useWebSocketNotifyWithLoading";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import { ErrorCode } from "../types";
 import "../css/Home.css";

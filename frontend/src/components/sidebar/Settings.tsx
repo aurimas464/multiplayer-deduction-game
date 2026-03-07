@@ -4,7 +4,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import { type Theme, type ColorTheme, type Language, themes, colorThemes, languages, type User, type UserSettings } from "../../types/settings";
 import { userService } from "../../services/user";
 import { useUser } from "../../contexts/UserContext";
-import { useTranslation } from "../../contexts/useTranslation";
+import { useTranslation } from "../../hooks/useTranslation";
 import { usePopup } from "../../contexts/PopupContext";
 import { errorMapper } from "../../utils/errorMapper";
 import defaultIcon from "../../assets/default-user-icon.png";
@@ -231,7 +231,7 @@ const Settings = () => {
 					<h4>{t("components.sidebar.settings.languages")}</h4>
 					<div className="form-group">
 						<select
-							className="settings-dropdown"
+							className="custom-dropdown"
 							value={currentSettings.language}
 							onChange={handleLanguageChange}
 						>
@@ -249,7 +249,7 @@ const Settings = () => {
 					<h4>{t("components.sidebar.settings.themes")}</h4>
 					<div className="form-group">
 						<select
-							className="settings-dropdown"
+							className="custom-dropdown"
 							value={currentSettings.theme}
 							onChange={handleThemeChange}
 						>
@@ -267,7 +267,7 @@ const Settings = () => {
 					<h4>{t("components.sidebar.settings.colorThemes")}</h4>
 					<div className="form-group">
 						<select
-							className="settings-dropdown"
+							className="custom-dropdown"
 							value={currentSettings.colorTheme}
 							onChange={handleColorThemeChange}
 						>
@@ -322,7 +322,7 @@ const Settings = () => {
 			</div>
 
 			<div className="sidebar-footer">
-				<button className="button" onClick={handleSaveClick}>
+				<button className="custom-button" onClick={handleSaveClick}>
 					{t("common.save")}
 				</button>
 			</div>

@@ -1,5 +1,5 @@
 import { ErrorCode } from "../types";
-import type { useTranslation } from "../contexts/useTranslation";
+import type { useTranslation } from "../hooks/useTranslation";
 import type { Language } from "../types/settings";
 
 type TranslateFn = ReturnType<typeof useTranslation>["t"];

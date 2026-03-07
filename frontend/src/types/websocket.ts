@@ -1,5 +1,9 @@
 import { ErrorCode, type ErrorDetail } from "./index";
 
+export const GameStatus = ["lobby", "in_progress", "finished", "cancelled"] as const;
+export const TieBehavior = ["no_one_dies", "random_among_tied", "revote"] as const;
+export const VoteCountVisibility = ["never", "end", "live"] as const;
+
 export type LobbyPlayer = {
 	playerId: number;
 	username: string;
@@ -8,13 +12,28 @@ export type LobbyPlayer = {
 	isOnline: boolean;
 	lastSeenAt: number | null;
 	seatNr: number;
-	hasIcon: boolean;
+};
+
+export type MetaSettings = {
+	maxPlayers: number;
+	minPlayers: number;
+	daySeconds: number;
+	votingSeconds: number;
+	nightSeconds: number;
+	tieBehavior: typeof TieBehavior[number];
+	voteCountVisibility: typeof VoteCountVisibility[number];
+	anonymousVoting: boolean;
+	roleRevealOnDeath: boolean;
+};
+
+export type RoleSettings = {
+	
 };
 
 export type LobbyStateData = {
 	players: LobbyPlayer[];
-	maxPlayers: number;
-	minPlayers: number;
+	metaSettings: MetaSettings;
+	roleSettings: RoleSettings;
 };
 
 export type ClientMessage =
@@ -27,7 +46,8 @@ export type ClientMessage =
 	| { type: "REQUEST_LOBBY_STATE" }
 	| { type: "RECOVER_GAME" }
 	| { type: "CHANGE_SEAT"; seatNr: number }
-	| { type: "SET_READY"; ready: boolean };
+	| { type: "SET_READY"; ready: boolean }
+	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: Partial<RoleSettings> };
 
 export type ServerMessage =
 	| { type: "ERROR"; code: ErrorCode; details?: ErrorDetail[] }
@@ -43,4 +63,5 @@ export type ServerMessage =
 	| { type: "RECOVER_GAME_NONE" }
 	| { type: "LOBBY_STATE"; data: LobbyStateData }
 	| { type: "CHANGE_SEAT_OK" }
-	| { type: "SET_READY_OK" };
+	| { type: "SET_READY_OK" }
+	| { type: "UPDATE_LOBBY_SETTINGS_OK" };

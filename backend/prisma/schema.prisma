@@ -36,6 +36,18 @@ enum GameStatus {
 	cancelled
 }
 
+enum TieBehavior {
+	no_one_dies
+	random_among_tied
+	revote
+}
+
+enum VoteCountVisibility {
+	never
+	end
+	live
+}
+
 model UserPlayer {
 	playerId Int @id
 	userId   Int @unique
@@ -111,8 +123,18 @@ model Game {
 	id         Int        @id @default(autoincrement())
 	gameCode   String     @unique
 	status     GameStatus @default(lobby)
-	maxPlayers Int        @default(10)
-	minPlayers Int        @default(5)
+
+	maxPlayers Int @default(10)
+	minPlayers Int @default(5)
+
+	daySeconds    Int @default(60) @db.SmallInt
+	votingSeconds Int @default(30) @db.SmallInt
+	nightSeconds  Int @default(60) @db.SmallInt
+
+	tieBehavior          TieBehavior         @default(no_one_dies)
+	voteCountVisibility  VoteCountVisibility @default(end)
+	anonymousVoting      Boolean             @default(false)
+	roleRevealOnDeath    Boolean             @default(true)
 
 	createdAt DateTime @default(now())
 	updatedAt DateTime @updatedAt

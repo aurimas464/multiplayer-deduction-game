@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { authService } from "../services/auth";
 import { type LoginCredentials } from "../types/auth";
-import { useTranslation } from "../contexts/useTranslation";
+import { useTranslation } from "../hooks/useTranslation";
 import { useLanguage } from "../contexts/LanguageContext";
 import { errorMapper } from "../utils/errorMapper";
 import "../css/auth.css";

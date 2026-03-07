@@ -2,6 +2,7 @@ import type WebSocket from "ws";
 import type { JwtPayload } from "./config";
 import { z } from "zod";
 import { ErrorCode } from "./index";
+import { TieBehavior, VoteCountVisibility } from "../types/entities/game";
 
 export type ConnectedUserSocket = WebSocket & {
 	userToken?: JwtPayload;
@@ -12,6 +13,36 @@ export type ConnectedUserSocket = WebSocket & {
 	isAuthenticated?: boolean;
 	gameCode?: string;
 };
+
+const lobbyPlayerSchema = z.object({
+	playerId: z.number(),
+	username: z.string().min(1),
+	iconEtag: z.string(),
+	isReady: z.boolean(),
+	isOnline: z.boolean(),
+	lastSeenAt: z.number().nullable(),
+	seatNr: z.number()
+}).strict();
+
+export const metaSettingsSchema = z.object({
+	maxPlayers: z.number(),
+	minPlayers: z.number(),
+	daySeconds: z.number(),
+	votingSeconds: z.number(),
+	nightSeconds: z.number(),
+	tieBehavior: z.enum(TieBehavior),
+	voteCountVisibility: z.enum(VoteCountVisibility),
+	anonymousVoting: z.boolean(),
+	roleRevealOnDeath: z.boolean()
+}).strict();
+
+export const roleSettingsSchema = z.object({
+
+}).strict();
+
+export type MetaSettings = z.infer<typeof metaSettingsSchema>;
+export type RoleSettings = z.infer<typeof roleSettingsSchema>;
+
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -50,24 +81,21 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 		type: z.literal("SET_READY"),
 		ready: z.boolean(),
 	}).strict(),
+	z.object({
+		type: z.literal("UPDATE_LOBBY_SETTINGS"),
+		metaSettings: metaSettingsSchema.partial(),
+		roleSettings: roleSettingsSchema.partial(),
+	}).strict()
 ]);
+
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
 export const lobbyStateDataSchema = z.object({
-	players: z.array(
-		z.object({
-			playerId: z.number(),
-			username: z.string().min(1),
-			iconEtag: z.string(),
-			isReady: z.boolean(),
-			isOnline: z.boolean(),
-			lastSeenAt: z.number().nullable(),
-			seatNr: z.number(),
-		}).strict(),
-	),
-	maxPlayers: z.number(),
-	minPlayers: z.number(),
+	players: z.array(lobbyPlayerSchema),
+	metaSettings: metaSettingsSchema,
+	roleSettings: roleSettingsSchema
 }).strict();
+
 export type LobbyStateData = z.infer<typeof lobbyStateDataSchema>;
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
@@ -126,6 +154,33 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("SET_READY_OK"),
 	}).strict(),
+	z.object({
+		type: z.literal("UPDATE_LOBBY_SETTINGS_OK"),
+	}).strict(),
 ]);
 
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+
+export type SessionPlayer = {
+	type: "user" | "bot";
+	playerId: number;
+	username: string;
+	isReady: boolean;
+	seatNr: number;
+	iconEtag: string;
+	joinedAt: number;
+	isOnline: boolean;
+	lastSeenAt: number;
+};
+
+export type GameSession = {
+	gameCode: string;
+	sockets: Set<ConnectedUserSocket>;
+	players: Map<number, SessionPlayer>;
+	metaSettings: MetaSettings;
+	roleSettings: RoleSettings;
+	userSocketCounts: Map<number, number>;
+	createdAt: number;
+	lastActiveAt: number;
+	emptySince?: number;
+};

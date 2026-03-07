@@ -18,7 +18,7 @@ class UserService {
 	async updateUser(userId: number, data: UserUpdateDTO): Promise<boolean> {
 		let iconEtag: string | undefined;
 
-		if (data.icon !== undefined) {
+		if (data.icon !== undefined && data.icon !== "") {
 			const result = await validateIcon(data.icon);
 
 			if (!result.ok) {
