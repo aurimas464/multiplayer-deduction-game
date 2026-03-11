@@ -11,7 +11,7 @@ export type ConnectedUserSocket = WebSocket & {
 	expireTimer?: NodeJS.Timeout;
 	authenticateTimer?: NodeJS.Timeout;
 	isAuthenticated?: boolean;
-	gameCode?: string;
+	game?: [string, number];
 };
 
 const lobbyPlayerSchema = z.object({
@@ -40,9 +40,40 @@ export const roleSettingsSchema = z.object({
 
 }).strict();
 
+export type LobbyPlayer = z.infer<typeof lobbyPlayerSchema>;
 export type MetaSettings = z.infer<typeof metaSettingsSchema>;
 export type RoleSettings = z.infer<typeof roleSettingsSchema>;
 
+export const lobbyStateDataSchema = z.object({
+	players: z.array(lobbyPlayerSchema),
+	metaSettings: metaSettingsSchema,
+	roleSettings: roleSettingsSchema
+}).strict();
+
+export type LobbyStateData = z.infer<typeof lobbyStateDataSchema>;
+
+export type SessionPlayer = {
+	type: "user" | "bot";
+	playerId: number;
+	username: string;
+	isReady: boolean;
+	seatNr: number;
+	iconEtag: string;
+	joinedAt: number;
+	isOnline: boolean;
+	lastSeenAt: number;
+};
+
+export type GameSession = {
+	sockets: Set<ConnectedUserSocket>;
+	players: Map<number, SessionPlayer>;
+	metaSettings: MetaSettings;
+	roleSettings: RoleSettings;
+	userSocketCounts: Map<number, number>;
+	createdAt: number;
+	lastActiveAt: number;
+	emptySince?: number;
+};
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -89,14 +120,6 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
-
-export const lobbyStateDataSchema = z.object({
-	players: z.array(lobbyPlayerSchema),
-	metaSettings: metaSettingsSchema,
-	roleSettings: roleSettingsSchema
-}).strict();
-
-export type LobbyStateData = z.infer<typeof lobbyStateDataSchema>;
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
 	z.object({
@@ -160,27 +183,3 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
-
-export type SessionPlayer = {
-	type: "user" | "bot";
-	playerId: number;
-	username: string;
-	isReady: boolean;
-	seatNr: number;
-	iconEtag: string;
-	joinedAt: number;
-	isOnline: boolean;
-	lastSeenAt: number;
-};
-
-export type GameSession = {
-	gameCode: string;
-	sockets: Set<ConnectedUserSocket>;
-	players: Map<number, SessionPlayer>;
-	metaSettings: MetaSettings;
-	roleSettings: RoleSettings;
-	userSocketCounts: Map<number, number>;
-	createdAt: number;
-	lastActiveAt: number;
-	emptySince?: number;
-};

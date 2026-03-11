@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { seatSchema } from "./seat";
+import { participantSchema } from "./participant";
 
 export const GameStatus = ["lobby", "in_progress", "finished", "cancelled"] as const;
+export const PhaseType = ["day", "voting", "night"] as const;
 export const TieBehavior = ["no_one_dies", "random_among_tied", "revote"] as const;
 export const VoteCountVisibility = ["never", "end", "live"] as const;
+export const RoleDistributionMode = ["exact", "weighted_random"] as const;
 
 export const gameSchema = z.object({
 	id: z.number().int(),
@@ -13,6 +15,7 @@ export const gameSchema = z.object({
 	maxPlayers: z.number().int(),
 	minPlayers: z.number().int(),
 
+	phaseType: z.enum(PhaseType).nullable(),
 	daySeconds: z.number().int(),
 	votingSeconds: z.number().int(),
 	nightSeconds: z.number().int(),
@@ -21,29 +24,32 @@ export const gameSchema = z.object({
 	voteCountVisibility: z.enum(VoteCountVisibility),
 	anonymousVoting: z.boolean(),
 	roleRevealOnDeath: z.boolean(),
+	roleDistributionMode: z.enum(RoleDistributionMode),
 
 	createdAt: z.coerce.date(),
 	updatedAt: z.coerce.date(),
 }).strip();
 
-export const gameWithSeatsSchema = gameSchema.extend({
-	seats: z.array(
-		seatSchema.pick({
+export const gameWithParticipantsSchema = gameSchema.extend({
+	participants: z.array(
+		participantSchema.pick({
 			playerId: true,
-			number: true,
+			seatNr: true,
+			roleId: true,
 		})
 	),
 }).strip();
 
 export const responseLobbyGameSchema = gameSchema.extend({
-	seats: z.array(
-		seatSchema.pick({
+	participants: z.array(
+		participantSchema.pick({
 			playerId: true,
-			number: true,
+			seatNr: true,
+			roleId: true,
 		})
 	),
 }).strip();
 
 export type Game = z.infer<typeof gameSchema>;
-export type GameWithSeats = z.infer<typeof gameWithSeatsSchema>;
+export type GameWithParticipants = z.infer<typeof gameWithParticipantsSchema>;
 export type ResponseLobbyGame = z.infer<typeof responseLobbyGameSchema>;

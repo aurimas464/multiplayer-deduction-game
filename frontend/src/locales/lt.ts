@@ -160,20 +160,19 @@ export const lt = {
 			[ErrorCode.INVALID_GAME_CODE]: "Invalid game code.",
 			[ErrorCode.GAME_ALREADY_STARTED]: "The game has already started.",
 			[ErrorCode.GAME_FULL]: "The game is full.",
-
-			[ErrorCode.USER_NOT_FOUND]: "User not found.",
-			[ErrorCode.INVALID_USER_ID]: "Invalid user ID.",
-			[ErrorCode.FRIENDSHIP_ALREADY_EXISTS]: "Friendship already exists.",
-			[ErrorCode.FRIEND_REQUEST_NOT_FOUND]: "Friend request not found.",
-			[ErrorCode.FRIENDSHIP_NOT_FOUND]: "Friendship not found.",
-
-			[ErrorCode.USER_NOT_BLOCKED]: "User is not blocked.",
-
+			[ErrorCode.NOT_GAME_LEADER]: "You are not the game leader.",
+			[ErrorCode.LOBBY_TOO_SMALL]: "Not enough players in the lobby to start.",
 			[ErrorCode.GAME_NOT_CREATED]: "Failed to create game.",
 			[ErrorCode.ALREADY_IN_GAME]: "You are already in a game.",
 			[ErrorCode.INVALID_SEAT]: "Invalid seat.",
 			[ErrorCode.SEAT_TAKEN]: "That seat is already taken.",
-			[ErrorCode.LOBBY_TOO_SMALL]: "Not enough players in the lobby to start.",
+			[ErrorCode.USER_NOT_FOUND]: "User not found.",
+
+			[ErrorCode.INVALID_USER_ID]: "Invalid user ID.",
+			[ErrorCode.FRIENDSHIP_ALREADY_EXISTS]: "Friendship already exists.",
+			[ErrorCode.FRIEND_REQUEST_NOT_FOUND]: "Friend request not found.",
+			[ErrorCode.FRIENDSHIP_NOT_FOUND]: "Friendship not found.",
+			[ErrorCode.USER_NOT_BLOCKED]: "User is not blocked.",
 		},
 	},
 } as const;

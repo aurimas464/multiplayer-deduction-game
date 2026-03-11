@@ -18,7 +18,6 @@ class UserController implements IUserController {
 			return;
 		}
 
-		console.log(dto);
 		const successResponse: ApiResponse = { success: true, result: dto };
 		res.status(200).json(successResponse);
 	}

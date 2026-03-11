@@ -1,9 +1,8 @@
 import prisma from "../prisma";
 import type { Prisma, Game as GamePrisma } from "@prisma/client";
-import type { Game, GameWithSeats } from "../types/entities/game";
-import { gameSchema, gameWithSeatsSchema } from "../types/entities/game";
-import { GameStatus } from "../types/entities/game";
-import { MetaSettings } from "../types/websocket";
+import type { Game, GameWithParticipants } from "../types/entities/game";
+import { gameSchema, gameWithParticipantsSchema, GameStatus } from "../types/entities/game";
+import type { MetaSettings } from "../types/websocket";
 
 class Model {
 	constructor(private readonly db: Prisma.TransactionClient | typeof prisma) {}
@@ -15,6 +14,7 @@ class Model {
 			status: p.status,
 			maxPlayers: p.maxPlayers,
 			minPlayers: p.minPlayers,
+			phaseType: p.phaseType,
 			daySeconds: p.daySeconds,
 			votingSeconds: p.votingSeconds,
 			nightSeconds: p.nightSeconds,
@@ -22,23 +22,25 @@ class Model {
 			voteCountVisibility: p.voteCountVisibility,
 			anonymousVoting: p.anonymousVoting,
 			roleRevealOnDeath: p.roleRevealOnDeath,
+			roleDistributionMode: p.roleDistributionMode,
 			createdAt: p.createdAt,
 			updatedAt: p.updatedAt,
 		});
 	}
 
-	public async lockGameForSeatMutation(gameId: number): Promise<{ id: number; status: typeof GameStatus[number]; maxPlayers: number } | null> {
-		const rows = await this.db.$queryRaw<{ id: number; status: typeof GameStatus[number]; maxPlayers: number }[]>`
-			SELECT id, status, maxPlayers
+	async lockGameForSeatMutation(gameId: number): Promise<{ id: number; status: typeof GameStatus[number]; maxPlayers: number; gameCode: string } | null> {
+		const rows = await this.db.$queryRaw<{ id: number; status: typeof GameStatus[number]; maxPlayers: number; gameCode: string }[]>`
+			SELECT id, status, maxPlayers, gameCode
 			FROM Game
 			WHERE id = ${gameId}
-			FOR UPDATE
-		`;
+			FOR UPDATE`;
+		
 		return rows[0] ?? null;
 	}
 
 	async findByGameCode(gameCode: string): Promise<Game | null> {
 		const row = await this.db.game.findUnique({ where: { gameCode } });
+
 		return row ? this.mapGame(row) : null;
 	}
 
@@ -53,20 +55,11 @@ class Model {
 		return this.mapGame(row);
 	}
 
-	async existsByCode(gameCode: string): Promise<boolean> {
-		const row = await this.db.game.findUnique({
-			where: { gameCode },
-			select: { id: true },
-		});
-
-		return !!row;
-	}
-
 	async findActiveGameByPlayerId(playerId: number): Promise<Game | null> {
 		const row = await this.db.game.findFirst({
 			where: {
 				status: { in: ["lobby", "in_progress"] },
-				seats: { some: { playerId } },
+				participants: { some: { playerId } },
 			},
 			orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
 		});
@@ -74,28 +67,28 @@ class Model {
 		return row ? this.mapGame(row) : null;
 	}
 
-	async findGameWithSeats(gameCode: string): Promise<GameWithSeats | null> {
+	async findGameWithParticipants(gameId: number): Promise<GameWithParticipants | null> {
 		const row = await this.db.game.findFirst({
-			where: { gameCode },
+			where: { id: gameId },
 			include: {
-				seats: {
-					orderBy: { number: "asc" },
+				participants: {
+					orderBy: { seatNr: "asc" },
 				},
 			},
 		});
 
-		return row ? gameWithSeatsSchema.parse(row) : null;
+		return row ? gameWithParticipantsSchema.parse(row) : null;
 	}
 
-	async removePlayerFromGame(gameCode: string, playerId: number): Promise<void> {
+	async removePlayerFromGame(gameId: number, playerId: number): Promise<void> {
 		const target = await this.db.game.findUnique({
-			where: { gameCode },
+			where: { id: gameId },
 			select: { id: true },
 		});
 
 		if (!target) return;
 
-		await this.db.seat.deleteMany({
+		await this.db.participant.deleteMany({
 			where: {
 				gameId: target.id,
 				playerId,
@@ -103,17 +96,9 @@ class Model {
 		});
 	}
 
-	async updateMaxPlayers(gameId: number, maxPlayers: number): Promise<Game> {
-		const row = await this.db.game.update({
-			where: { id: gameId },
-			data: { maxPlayers },
-		});
-
-		return this.mapGame(row);
-	}
-
 	async update(gameId: number, update: Partial<MetaSettings>): Promise<boolean> {
 		const gameData: Record<string, unknown> = {};
+
 		if (update.maxPlayers !== undefined) gameData.maxPlayers = update.maxPlayers;
 		if (update.minPlayers !== undefined) gameData.minPlayers = update.minPlayers;
 		if (update.daySeconds !== undefined) gameData.daySeconds = update.daySeconds;
@@ -127,6 +112,7 @@ class Model {
 		if (Object.keys(gameData).length === 0) {
 			const row = await this.db.game.findUnique({
 				where: { id: gameId },
+				select: { id: true },
 			});
 
 			if (!row) {

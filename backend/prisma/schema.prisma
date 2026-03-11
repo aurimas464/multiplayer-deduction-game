@@ -48,6 +48,23 @@ enum VoteCountVisibility {
 	live
 }
 
+enum RoleAlignment {
+	vampire
+	commune
+	neutral
+}
+
+enum PhaseType {
+	day
+	voting
+	night
+}
+
+enum RoleDistributionMode {
+	exact
+	weighted_random
+}
+
 model UserPlayer {
 	playerId Int @id
 	userId   Int @unique
@@ -116,41 +133,79 @@ model Player {
 	user UserPlayer?
 	bot  BotPlayer?
 
-	seats Seat[]
+	participants Participant[]
 }
 
 model Game {
-	id         Int        @id @default(autoincrement())
-	gameCode   String     @unique
-	status     GameStatus @default(lobby)
+	id       Int        @id @default(autoincrement())
+	gameCode String     @unique
+	status   GameStatus @default(lobby)
 
-	maxPlayers Int @default(10)
-	minPlayers Int @default(5)
+	maxPlayers Int @db.SmallInt @default(10)
+	minPlayers Int @db.SmallInt @default(5)
 
-	daySeconds    Int @default(60) @db.SmallInt
-	votingSeconds Int @default(30) @db.SmallInt
-	nightSeconds  Int @default(60) @db.SmallInt
+	phaseType     PhaseType?
+	daySeconds    Int @db.SmallInt @default(60)
+	votingSeconds Int @db.SmallInt @default(30)
+	nightSeconds  Int @db.SmallInt @default(60)
 
-	tieBehavior          TieBehavior         @default(no_one_dies)
-	voteCountVisibility  VoteCountVisibility @default(end)
-	anonymousVoting      Boolean             @default(false)
-	roleRevealOnDeath    Boolean             @default(true)
+	tieBehavior          TieBehavior          @default(no_one_dies)
+	voteCountVisibility  VoteCountVisibility  @default(end)
+	anonymousVoting      Boolean              @default(false)
+	roleRevealOnDeath    Boolean              @default(true)
+	roleDistributionMode RoleDistributionMode @default(exact)
 
 	createdAt DateTime @default(now())
 	updatedAt DateTime @updatedAt
 
-	seats Seat[]
+	participants Participant[]
+	roleSetup    GameRoleSetup[]
 }
 
-model Seat {
+model GameRoleSetup {
+	id Int @id @default(autoincrement())
+
+	gameId Int
+	roleId Int
+	count  Int? @db.SmallInt
+
+	game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	@@unique([gameId, roleId])
+	@@index([gameId])
+	@@index([roleId])
+}
+
+model Role {
+	id        Int           @id @default(autoincrement())
+	key       String        @unique
+	alignment RoleAlignment
+	weight    Int           @db.SmallInt
+
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+
+	gameSetupEntries GameRoleSetup[]
+	participants     Participant[]
+}
+
+model Participant {
 	gameId   Int
 	playerId Int
-	number   Int
+	seatNr   Int
+	roleId   Int?
 
 	game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
 	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	role   Role?  @relation(fields: [roleId], references: [id])
 
 	@@id([gameId, playerId])
-	@@unique([gameId, number])
+	@@unique([gameId, seatNr])
 	@@index([playerId])
+	@@index([roleId])
+	@@index([gameId])
 }

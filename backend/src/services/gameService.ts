@@ -1,17 +1,15 @@
-import prisma from "../prisma";
-import type { Prisma } from "@prisma/client";
 import { AppError, ErrorCode } from "../types";
-import type { Game, GameWithSeats } from "../types/entities/game";
-import { GameModel, GameModelTransaction } from "../models/game";
-import { SeatModel, SeatModelTransaction } from "../models/seat";
-import type { Seat } from "../types/entities/seat";
+import type { Game, GameWithParticipants } from "../types/entities/game";
+import { GameModel } from "../models/game";
+import { ParticipantModel } from "../models/participant";
+import type { Participant } from "../types/entities/participant";
 import gameLobbyService from "./gameLobbyService";
 
 class GameService {
 	public async createGame(): Promise<Game> {
 		for (let attempt = 0; attempt < 5; attempt++) {
 			const gameCode = this.generateGameCode();
-			
+
 			try {
 				return await GameModel.create(gameCode);
 			} catch (err: unknown) {
@@ -23,62 +21,39 @@ class GameService {
 		throw new AppError(ErrorCode.GAME_NOT_CREATED);
 	}
 
-	public async getLobbyMeta(gameCode: string): Promise<GameWithSeats | null> {
-		return GameModel.findGameWithSeats(gameCode);
+	public async getLobbyMeta(gameId: number): Promise<GameWithParticipants | null> {
+		return GameModel.findGameWithParticipants(gameId);
 	}
 
-	public async existsByCode(gameCode: string): Promise<boolean> {
-		return GameModel.existsByCode(gameCode);
-	}
-
-	public async findByGameCodeAndPlayerId(gameCode: string, playerId: number): Promise<Seat | null> {
-		return SeatModel.findByGameCodeAndPlayerId(gameCode, playerId);
+	public async findByGameIdAndPlayerId(gameId: number, playerId: number): Promise<Participant | null> {
+		return ParticipantModel.findByGameIdAndPlayerId(gameId, playerId);
 	}
 
 	public async latestActiveGameForPlayer(playerId: number): Promise<Game | null> {
 		return GameModel.findActiveGameByPlayerId(playerId);
 	}
 
-	public async joinGame(playerId: number, gameCode: string): Promise<Seat> {
+	public async joinGame(playerId: number, gameCode: string): Promise<Participant> {
 		const code = gameCode.trim();
 
-		return prisma.$transaction(async (tx) => {
-			const gamesModel = GameModelTransaction(tx);
-			const seatsModel = SeatModelTransaction(tx);
+		const game = await GameModel.findByGameCode(code);
+		if (!game) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+		if (game.status !== "lobby") {
+			throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
+		}
 
-			const lobby = await gamesModel.findGameWithSeats(code);
-			if (!lobby) {
-				throw new AppError(ErrorCode.GAME_NOT_FOUND);
-			}
+		const existing = await ParticipantModel.findByGameIdAndPlayerId(game.id, playerId);
+		if (existing) {
+			return existing;
+		}
 
-			const locked = await gamesModel.lockGameForSeatMutation(lobby.id);
-			if (!locked) {
-				throw new AppError(ErrorCode.GAME_NOT_FOUND);
-			}
-			if (locked.status !== "lobby") {
-				throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
-			}
-
-			const current = await gamesModel.findActiveGameByPlayerId(playerId);
-			if (current?.gameCode && current.gameCode !== code) {
-				throw new AppError(ErrorCode.ALREADY_IN_GAME);
-			}
-
-			const rows = await seatsModel.findByGameId(locked.id);
-			const mine = rows.find((s) => s.playerId === playerId);
-			if (mine) return mine;
-
-			const occupiedNumbers = rows.map((s) => s.number);
-
-			return gameLobbyService.claimSeat(tx, locked.id, playerId, locked.maxPlayers, occupiedNumbers);
-		});
+		return gameLobbyService.claimSeat(game.id, playerId);
 	}
 
-	public async leaveGame(playerId: number, gameCode: string): Promise<void> {
-		return prisma.$transaction(async (tx) => {
-			const gamesModel = GameModelTransaction(tx);
-			await gamesModel.removePlayerFromGame(gameCode.trim(), playerId);
-		});
+	public async leaveGame(playerId: number, gameId: number): Promise<void> {
+		await GameModel.removePlayerFromGame(gameId, playerId);
 	}
 
 	private generateGameCode(): string {

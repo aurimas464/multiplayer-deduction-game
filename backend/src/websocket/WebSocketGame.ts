@@ -9,33 +9,34 @@ export class WebSocketGame {
 	private readonly sessions: WebSocketGameSession;
 
 	public constructor(private readonly sendMessage: (ws: ConnectedUserSocket, msg: ServerMessage) => void) {
-		this.sessions = new WebSocketGameSession((gameCode) => this.broadcastLobbyState(gameCode));
+		this.sessions = new WebSocketGameSession((gameId) => this.broadcastLobbyState(gameId));
 		this.sessions.start();
 	}
 
-	private async ensureSession(gameCode: string) {
-		let session = this.sessions.get(gameCode);
+	private async ensureSession(gameId: number) {
+		const session = this.sessions.get(gameId);
 		if (session) return session;
 
-		const lobby = await GameService.getLobbyMeta(gameCode);
+		const lobby = await GameService.getLobbyMeta(gameId);
 		if (!lobby) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
-			return this.sessions.create(gameCode, {
-				maxPlayers: lobby.maxPlayers,
-				minPlayers: lobby.minPlayers,
-				daySeconds: lobby.daySeconds,
-				votingSeconds: lobby.votingSeconds,
-				nightSeconds: lobby.nightSeconds,
-				tieBehavior: lobby.tieBehavior,
-				voteCountVisibility: lobby.voteCountVisibility,
-				anonymousVoting: lobby.anonymousVoting,
-				roleRevealOnDeath: lobby.roleRevealOnDeath,
-			}, {});
+
+		return this.sessions.create(lobby.id, {
+			maxPlayers: lobby.maxPlayers,
+			minPlayers: lobby.minPlayers,
+			daySeconds: lobby.daySeconds,
+			votingSeconds: lobby.votingSeconds,
+			nightSeconds: lobby.nightSeconds,
+			tieBehavior: lobby.tieBehavior,
+			voteCountVisibility: lobby.voteCountVisibility,
+			anonymousVoting: lobby.anonymousVoting,
+			roleRevealOnDeath: lobby.roleRevealOnDeath,
+		}, {});
 	}
 
 	public track(ws: ConnectedUserSocket): void {
-		ws.gameCode = undefined;
+		ws.game = undefined;
 
 		ws.once("close", () => {
 			this.sessions.leaveSession(ws);
@@ -43,8 +44,9 @@ export class WebSocketGame {
 	}
 
 	public async handleMessage(ws: ConnectedUserSocket, msg: ClientMessage): Promise<void> {
-		if (ws.gameCode && ws.userToken?.playerId) {
-			this.sessions.touch(ws.gameCode, ws.userToken.playerId);
+		const [, currentGameId] = ws.game ?? [undefined, undefined];
+		if (currentGameId && ws.userToken?.playerId) {
+			this.sessions.touch(currentGameId, ws.userToken.playerId);
 		}
 
 		switch (msg.type) {
@@ -71,7 +73,7 @@ export class WebSocketGame {
 			case "CHANGE_SEAT":
 				await this.onChangeSeat(ws, msg.seatNr);
 				return;
-				
+
 			case "SET_READY":
 				await this.onSetReady(ws, msg.ready);
 				return;
@@ -84,8 +86,8 @@ export class WebSocketGame {
 
 	private async onCreateGame(ws: ConnectedUserSocket): Promise<void> {
 		const created = await GameService.createGame();
-		if (created) {
-			this.sessions.create(created.gameCode, {
+        if (created) {
+			this.sessions.create(created.id, {
 				maxPlayers: created.maxPlayers,
 				minPlayers: created.minPlayers,
 				daySeconds: created.daySeconds,
@@ -110,17 +112,18 @@ export class WebSocketGame {
 			throw new AppError(ErrorCode.UNAUTHORIZED);
 		}
 
-		const seat = await GameService.joinGame(playerId, code);
+		const participant = await GameService.joinGame(playerId, code);
 		const iconEtag = await UserService.getIconEtag(playerId);
 
-		await this.ensureSession(code);
-		if (!this.sessions.upsertPlayer(code, seat, username, iconEtag ?? "")) {
+		await this.ensureSession(participant.gameId);
+		if (!this.sessions.upsertPlayer(participant.gameId, participant, username, iconEtag ?? "")) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
-		if (!this.sessions.joinSession(ws, code)) {
+		if (!this.sessions.joinSession(ws, participant.gameId)) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
 
+		ws.game = [code, participant.gameId];
 		this.sendMessage(ws, { type: "JOIN_GAME_OK", gameCode: code });
 	}
 
@@ -137,41 +140,42 @@ export class WebSocketGame {
 			return;
 		}
 
-		const seat = await GameService.findByGameCodeAndPlayerId(current.gameCode, playerId);
-		if (!seat) {
+		const participant = await GameService.findByGameIdAndPlayerId(current.id, playerId);
+		if (!participant) {
 			this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 			return;
 		}
 
 		const iconEtag = await UserService.getIconEtag(playerId);
 
-		await this.ensureSession(current.gameCode);
-		if (!this.sessions.upsertPlayer(current.gameCode, seat, username, iconEtag ?? "")) {
+		await this.ensureSession(current.id);
+		if (!this.sessions.upsertPlayer(current.id, participant, username, iconEtag ?? "")) {
 			this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 			return;
 		}
-		if (!this.sessions.joinSession(ws, current.gameCode)) {
+		if (!this.sessions.joinSession(ws, current.id)) {
 			this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 			return;
 		}
 
+		ws.game = [current.gameCode, participant.gameId];
 		this.sendMessage(ws, { type: "RECOVER_GAME_OK", gameCode: current.gameCode });
 	}
 
 	private async onLeaveGame(ws: ConnectedUserSocket): Promise<void> {
 		const playerId = ws.userToken?.playerId;
+		const game = ws.game;
 		if (!playerId) {
 			throw new AppError(ErrorCode.UNAUTHORIZED);
 		}
-
-		const code = ws.gameCode;
-		if (!code) {
+		if (!game) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
+		const [, gameId] = game;
 
-		await GameService.leaveGame(playerId, code);
+		await GameService.leaveGame(playerId, gameId);
 
-		this.sessions.removePlayer(code, playerId);
+		this.sessions.removePlayer(gameId, playerId);
 		this.sessions.leaveSession(ws);
 
 		this.sendMessage(ws, { type: "LEAVE_GAME_OK" });
@@ -179,39 +183,82 @@ export class WebSocketGame {
 
 	private async onChangeSeat(ws: ConnectedUserSocket, seatNr: number): Promise<void> {
 		const playerId = ws.userToken?.playerId;
-		const username = ws.userToken?.username;
-		if (!playerId || !username) {
+		const game = ws.game;
+		if (!playerId) {
 			throw new AppError(ErrorCode.UNAUTHORIZED);
 		}
+		if (!game) {
+			throw new AppError(ErrorCode.NOT_IN_LOBBY);
+		}
+		const [, gameId] = game;
 
-		const code = ws.gameCode;
-		if (!code) {
+		await GameLobbyService.changeSeat(playerId, gameId, seatNr);
+
+		const participant = await GameService.findByGameIdAndPlayerId(gameId, playerId);
+		if (!participant) {
 			throw new AppError(ErrorCode.NOT_IN_LOBBY);
 		}
 
-		await GameLobbyService.changeSeat(playerId, code, seatNr);
-
-		const seat = await GameService.findByGameCodeAndPlayerId(code, playerId);
-		if (!seat) {
-			throw new AppError(ErrorCode.NOT_IN_LOBBY);
-		}
-
-		await this.ensureSession(code);
-		if (!this.sessions.changeSeat(code, seat.playerId, seatNr)) {
+		await this.ensureSession(gameId);
+		if (!this.sessions.changeSeat(gameId, participant.playerId, seatNr)) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
 
 		this.sendMessage(ws, { type: "CHANGE_SEAT_OK" });
 	}
 
-	private async onRequestLobbyState(ws: ConnectedUserSocket): Promise<void> {
-		const code = ws.gameCode;
-		if (!code) {
+	private async onSetReady(ws: ConnectedUserSocket, ready: boolean): Promise<void> {
+		const playerId = ws.userToken?.playerId;
+		const game = ws.game;
+		if (!game) {
 			throw new AppError(ErrorCode.NOT_IN_LOBBY);
 		}
+		if (!playerId) {
+			throw new AppError(ErrorCode.UNAUTHORIZED);
+		}
+		const [, gameId] = game;
 
-		await this.ensureSession(code);
-		const snapshot = this.sessions.getLobbySnapshot(code);
+		await this.ensureSession(gameId);
+		if (!this.sessions.setReady(gameId, playerId, ready)) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+
+		this.sendMessage(ws, { type: "SET_READY_OK" });
+	}
+
+	private async onUpdateLobbySettings(ws: ConnectedUserSocket, metaSettings: Partial<MetaSettings>, _roleSettings: Partial<RoleSettings>): Promise<void> {
+		const playerId = ws.userToken?.playerId;
+		const game = ws.game;
+		if (!playerId) {
+			throw new AppError(ErrorCode.UNAUTHORIZED);
+		}
+		if (!game) {
+			throw new AppError(ErrorCode.NOT_IN_LOBBY);
+		}
+		const [, gameId] = game;
+
+		const updated = await GameLobbyService.updateLobbySettings(playerId, gameId, metaSettings);
+		if (!updated) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+
+		await this.ensureSession(gameId);
+		if (!this.sessions.updateMetaSettings(gameId, metaSettings)) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+
+		this.sendMessage(ws, { type: "UPDATE_LOBBY_SETTINGS_OK" });
+	}
+
+	private async onRequestLobbyState(ws: ConnectedUserSocket): Promise<void> {
+		const game = ws.game;
+		if (!game) {
+			throw new AppError(ErrorCode.NOT_IN_LOBBY);
+		}
+		const [, gameId] = game;
+
+		await this.ensureSession(gameId);
+		const snapshot = this.sessions.getLobbySnapshot(gameId);
 		if (!snapshot) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
@@ -219,14 +266,15 @@ export class WebSocketGame {
 		this.sendMessage(ws, { type: "LOBBY_STATE", data: snapshot });
 	}
 
-	private broadcastLobbyState(gameCode: string): void {
-		const session = this.sessions.get(gameCode);
+	private broadcastLobbyState(gameId: number): void {
+		const session = this.sessions.get(gameId);
 		if (!session) return;
 
-		const snapshot = this.sessions.getLobbySnapshot(gameCode);
+		const snapshot = this.sessions.getLobbySnapshot(gameId);
 		if (!snapshot) return;
 
 		const payload: ServerMessage = { type: "LOBBY_STATE", data: snapshot };
+
 		for (const client of session.sockets) {
 			if (client.readyState !== 1) continue;
 
@@ -236,48 +284,5 @@ export class WebSocketGame {
 				// ignore
 			}
 		}
-	}
-
-	private async onSetReady(ws: ConnectedUserSocket, ready: boolean): Promise<void> {
-		const playerId = ws.userToken?.playerId;
-		if (!playerId) {
-			throw new AppError(ErrorCode.UNAUTHORIZED);
-		}
-
-		const code = ws.gameCode;
-		if (!code) {
-			throw new AppError(ErrorCode.NOT_IN_LOBBY);
-		}
-
-		await this.ensureSession(code);
-		if (!this.sessions.setReady(code, playerId, ready)) {
-			throw new AppError(ErrorCode.GAME_NOT_FOUND);
-		}
-
-		this.sendMessage(ws, { type: "SET_READY_OK" });
-	}
-
-	private async onUpdateLobbySettings(ws: ConnectedUserSocket, metaSettings: Partial<MetaSettings>, roleSettings: Partial<RoleSettings>): Promise<void> {
-		const playerId = ws.userToken?.playerId;
-		if (!playerId) {
-			throw new AppError(ErrorCode.UNAUTHORIZED);
-		}
-		const code = ws.gameCode;
-		if (!code) {
-			throw new AppError(ErrorCode.NOT_IN_LOBBY);
-		}
-
-		const updated = await GameLobbyService.updateLobbySettings(playerId, code, metaSettings);
-		if (!updated) {
-			throw new AppError(ErrorCode.GAME_NOT_FOUND);
-		}
-
-		await this.ensureSession(code);
-
-		if (!this.sessions.updateMetaSettings(code, metaSettings)) {
-			throw new AppError(ErrorCode.GAME_NOT_FOUND);
-		}
-
-		this.sendMessage(ws, { type: "UPDATE_LOBBY_SETTINGS_OK" });
 	}
 }
