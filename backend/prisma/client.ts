@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import config from "./config";
+import config from "../src/config";
 
 const adapter = new PrismaMariaDb({
 	host: config.database.host,

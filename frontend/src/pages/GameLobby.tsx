@@ -6,7 +6,7 @@ import { useWebSocket } from "../contexts/WebSocketContext";
 import { useWebSocketNotifyWithLoading } from "../hooks/useWebSocketNotifyWithLoading";
 import "../css/GameLobby.css";
 import { ErrorCode } from "../types";
-import type { LobbyStateData, MetaSettings } from "../types/websocket";
+import { RoleDistributionMode, TieBehavior, VoteCountVisibility, type LobbyStateData, type MetaSettings } from "../types/websocket";
 import { cacheGet, cacheSet } from "../utils/localForage";
 import { userService } from "../services/user";
 import { errorMapper } from "../utils/errorMapper";
@@ -15,6 +15,25 @@ import defaultIcon from "../assets/default-user-icon.png";
 import { StarIcon, CheckCircleIcon, ClockIcon, ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { useUser } from "../contexts/UserContext";
 import { useLobbySettings } from "../hooks/useLobbySettings";
+import { type RoleAlignment, type Role, roleAlignment } from "../types/role";
+import { roleService } from "../services/role";
+
+const DEFAULT_LOBBY_STATE: LobbyStateData = {
+	players: [],
+	metaSettings: {
+		maxPlayers: 10,
+		minPlayers: 5,
+		daySeconds: 60,
+		votingSeconds: 30,
+		nightSeconds: 60,
+		tieBehavior: "no_one_dies",
+		voteCountVisibility: "end",
+		anonymousVoting: false,
+		roleRevealOnDeath: true,
+		roleDistributionMode: "exact"
+	},
+	roleSettings: {}
+};
 
 const GameLobby = () => {
 	const navigate = useNavigate();
@@ -27,21 +46,8 @@ const GameLobby = () => {
 	const { gameCode } = useParams<{ gameCode: string }>();
 
 	const [playerIcons, setPlayerIcons] = useState<Record<number, string>>({});
-	const [lobbyState, setLobbyState] = useState<LobbyStateData>({
-		players: [],
-		metaSettings: {
-			maxPlayers: 10,
-			minPlayers: 5,
-			daySeconds: 60,
-			votingSeconds: 30,
-			nightSeconds: 60,
-			tieBehavior: "no_one_dies",
-			voteCountVisibility: "end",
-			anonymousVoting: false,
-			roleRevealOnDeath: true
-		},
-		roleSettings: {}
-	});
+	const [roles, setRoles] = useState<Role[]>([]);
+	const [lobbyState, setLobbyState] = useState<LobbyStateData>(DEFAULT_LOBBY_STATE);
 	const [loaded, setLoaded] = useState(false);
 
 	const mountedRef = useRef(true);
@@ -49,7 +55,7 @@ const GameLobby = () => {
 	const settingReadyRef = useRef(false);
 	const leavingRef = useRef(false);
 
-	const { draftLobbySettings, metaInputs, applyMetaSetting, updateMetaInput, flushMetaInput } = useLobbySettings({ lobbyState, onSaveSettings: (metaSettings, roleSettings, handlers) => {
+	const { draftLobbySettings, metaInputs, applyMetaSetting, updateMetaInput, flushMetaInput, applyRoleSetting } = useLobbySettings({ lobbyState, onSaveSettings: (metaSettings, roleSettings, handlers) => {
 		notifyWithLoading(
 			{ type: "UPDATE_LOBBY_SETTINGS", metaSettings, roleSettings },
 			{
@@ -80,6 +86,35 @@ const GameLobby = () => {
 			mountedRef.current = false;
 		};
 	}, []);
+
+	useEffect(() => {
+		let cancelled = false;
+
+		const loadRoles = async () => {
+			const response = await roleService.getRoles();
+			if (cancelled) return;
+
+			if (response.success) {
+				setRoles(response.result || []);
+				return;
+			} else{
+				const code = response.errors?.[0]?.code;
+				const errorMessage = errorMapper(code, t, language);
+				showPopup({
+					type: "error",
+					title: t("common.error"),
+					payload: { message: errorMessage },
+					autoCloseDelay: 5000,
+				});
+			}
+		};
+
+		loadRoles().catch(() => {});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [language, showPopup, t]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -131,7 +166,8 @@ const GameLobby = () => {
 				if (!cancelled) {
 					setPlayerIcons(mergedIcons);
 				}
-			} else {
+
+			} else{
 				const code = response.errors?.[0]?.code;
 				const errorMessage = errorMapper(code, t, language);
 
@@ -139,7 +175,7 @@ const GameLobby = () => {
 					type: "error",
 					title: t("common.error"),
 					payload: { message: errorMessage },
-					autoCloseDelay: 5000
+					autoCloseDelay: 5000,
 				});
 			}
 		};
@@ -164,13 +200,23 @@ const GameLobby = () => {
 		return Array.from({ length: max }, (_, i) => i + 1);
 	}, [draftLobbySettings.metaSettings.maxPlayers]);
 
-	const myPlayerId = user?.player?.id ?? null;
+	const rolesByAlignment = useMemo<Record<RoleAlignment, Role[]>>(() => {
+		const grouped: Record<RoleAlignment, Role[]> = {
+			vampire: [],
+			commune: [],
+			neutral: []
+		};
+		for (const role of roles) {
+			grouped[role.alignment].push(role);
+		}
+		return grouped;
+	}, [roles]);
 
+	const myPlayerId = user?.player?.id ?? null;
 	const me = useMemo(() => {
 		if (!myPlayerId) return null;
 		return lobbyState.players.find((p) => p.playerId === myPlayerId) ?? null;
 	}, [lobbyState.players, myPlayerId]);
-
 	const myReady = me?.isReady ?? false;
 
 	useEffect(() => {
@@ -192,7 +238,7 @@ const GameLobby = () => {
 				rejectOn: (msg) =>
 					msg.type === "ERROR" &&
 					(msg.code === ErrorCode.NOT_IN_LOBBY || msg.code === ErrorCode.GAME_NOT_FOUND),
-				
+
 				onSuccess: (msg) => {
 					if (!mountedRef.current) return;
 
@@ -237,7 +283,7 @@ const GameLobby = () => {
 						msg.code === ErrorCode.NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_NOT_FOUND
 					),
-				
+
 				onSuccess: () => {
 					changingSeatRef.current = false;
 				},
@@ -313,6 +359,11 @@ const GameLobby = () => {
 		);
 	};
 
+	const getStepperBaseValue = (inputValue: string, fallbackValue: number) => {
+		const parsed = Number(inputValue);
+		return Number.isFinite(parsed) ? parsed : fallbackValue;
+	};
+
 	if (!loaded) return null;
 
 	return (
@@ -340,7 +391,7 @@ const GameLobby = () => {
 									return (
 										<div
 											key={seatNr}
-											className={["player-item", player ? "" : "player-item-empty"].join(" ")}
+											className={`player-item ${player ? "" : " player-item-empty"}`}
 											role="button"
 											onClick={!player && !changingSeatRef.current ? () => handleChangeSeat(seatNr) : undefined}
 										>
@@ -359,21 +410,21 @@ const GameLobby = () => {
 											</div>
 
 											<span className="player-item-icons">
-												{player ? (
+												{player && (
 													player.isReady ? (
 														<span>
-															<CheckCircleIcon className="h-5 w-5" style={{ color: "green" }} />
+															<CheckCircleIcon style={{ color: "green" }} />
 														</span>
 													) : (
 														<span>
-															<ClockIcon className="h-5 w-5" style={{ color: "yellow" }} />
+															<ClockIcon style={{ color: "yellow" }} />
 														</span>
 													)
-												) : null}
+												)}
 
 												{isLeader && (
 													<span>
-														<StarIcon className="h-5 w-5" style={{ color: "goldenrod" }} />
+														<StarIcon style={{ color: "goldenrod" }} />
 													</span>
 												)}
 											</span>
@@ -386,7 +437,7 @@ const GameLobby = () => {
 						<div className="players-actions">
 							<button
 								disabled={settingReadyRef.current}
-								className={["custom-button", "lobby-box", myReady ? "error" : "success"].join(" ")}
+								className={`custom-button lobby-box ${myReady ? "error" : "success"}`}
 								onClick={handleToggleReady}
 							>
 								{myReady ? t("pages.gameLobby.unready") : t("pages.gameLobby.ready")}
@@ -409,170 +460,323 @@ const GameLobby = () => {
 							</div>
 
 							<div className="settings-options">
-								<div className="settings-row">
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.maxPlayers")}</span>
+								<div className="settings-section">
+									<div className="settings-row">
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.maxPlayers")}</span>
 
-										<div className="custom-input-stepper">
-											<input
-												className="input"
-												type="number"
-												value={metaInputs.maxPlayers}
-												onChange={(e) => updateMetaInput("maxPlayers", e.target.value)}
-												onBlur={() => flushMetaInput("maxPlayers")}
-											/>
-											<div className="input-controls">
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("maxPlayers", String((Number(metaInputs.maxPlayers) || draftLobbySettings.metaSettings.maxPlayers) + 1))}><ChevronUpIcon className="h-4 w-4" /></button>
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("maxPlayers", String((Number(metaInputs.maxPlayers) || draftLobbySettings.metaSettings.maxPlayers) - 1))}><ChevronDownIcon className="h-4 w-4" /></button>
+											<div className="custom-input-stepper">
+												<input
+													className="input"
+													type="number"
+													value={metaInputs.maxPlayers}
+													onChange={(e) => updateMetaInput("maxPlayers", e.target.value)}
+													onBlur={() => flushMetaInput("maxPlayers")}
+												/>
+
+												<div className="input-controls">
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("maxPlayers", String(getStepperBaseValue(metaInputs.nightSeconds, draftLobbySettings.metaSettings.nightSeconds) - 1))}
+													>
+														<ChevronUpIcon />
+													</button>
+
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("maxPlayers", String(getStepperBaseValue(metaInputs.maxPlayers, draftLobbySettings.metaSettings.maxPlayers) - 1))}
+													>
+														<ChevronDownIcon />
+													</button>
+												</div>
+											</div>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.minPlayers")}</span>
+
+											<div className="custom-input-stepper">
+												<input
+													className="input"
+													type="number"
+													value={metaInputs.minPlayers}
+													onChange={(e) => updateMetaInput("minPlayers", e.target.value)}
+													onBlur={() => flushMetaInput("minPlayers")}
+												/>
+
+												<div className="input-controls">
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("minPlayers", String(getStepperBaseValue(metaInputs.minPlayers, draftLobbySettings.metaSettings.minPlayers) + 1))}
+													>
+														<ChevronUpIcon />
+													</button>
+
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("minPlayers", String(getStepperBaseValue(metaInputs.minPlayers, draftLobbySettings.metaSettings.minPlayers) - 1))}
+													>
+														<ChevronDownIcon />
+													</button>
+												</div>
 											</div>
 										</div>
 									</div>
 
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.minPlayers")}</span>
+									<div className="settings-row">
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.dayTime")}</span>
 
-										<div className="custom-input-stepper">
-											<input
-												className="input"
-												type="number"
-												value={metaInputs.minPlayers}
-												onChange={(e) => updateMetaInput("minPlayers", e.target.value)}
-												onBlur={() => flushMetaInput("minPlayers")}
-											/>
-											<div className="input-controls">
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("minPlayers", String((Number(metaInputs.minPlayers) || draftLobbySettings.metaSettings.minPlayers) + 1))}><ChevronUpIcon className="h-4 w-4" /></button>
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("minPlayers", String((Number(metaInputs.minPlayers) || draftLobbySettings.metaSettings.minPlayers) - 1))}><ChevronDownIcon className="h-4 w-4" /></button>
+											<div className="custom-input-stepper">
+												<input
+													className="input"
+													type="number"
+													value={metaInputs.daySeconds}
+													onChange={(e) => updateMetaInput("daySeconds", e.target.value)}
+													onBlur={() => flushMetaInput("daySeconds")}
+												/>
+
+												<div className="input-controls">
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("daySeconds", String(getStepperBaseValue(metaInputs.daySeconds, draftLobbySettings.metaSettings.daySeconds) + 1))}
+													>
+														<ChevronUpIcon />
+													</button>
+
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("daySeconds", String(getStepperBaseValue(metaInputs.daySeconds, draftLobbySettings.metaSettings.daySeconds) - 1))}
+													>
+														<ChevronDownIcon />
+													</button>
+												</div>
 											</div>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.votingTime")}</span>
+
+											<div className="custom-input-stepper">
+												<input
+													className="input"
+													type="number"
+													value={metaInputs.votingSeconds}
+													onChange={(e) => updateMetaInput("votingSeconds", e.target.value)}
+													onBlur={() => flushMetaInput("votingSeconds")}
+												/>
+
+												<div className="input-controls">
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("votingSeconds", String(getStepperBaseValue(metaInputs.votingSeconds, draftLobbySettings.metaSettings.votingSeconds) + 1))}
+													>
+														<ChevronUpIcon />
+													</button>
+
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("votingSeconds", String(getStepperBaseValue(metaInputs.votingSeconds, draftLobbySettings.metaSettings.votingSeconds) - 1))}
+													>
+														<ChevronDownIcon />
+													</button>
+												</div>
+											</div>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.nightTime")}</span>
+
+											<div className="custom-input-stepper">
+												<input
+													className="input"
+													type="number"
+													value={metaInputs.nightSeconds}
+													onChange={(e) => updateMetaInput("nightSeconds", e.target.value)}
+													onBlur={() => flushMetaInput("nightSeconds")}
+												/>
+
+												<div className="input-controls">
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("nightSeconds", String(getStepperBaseValue(metaInputs.nightSeconds, draftLobbySettings.metaSettings.nightSeconds) + 1))}
+													>
+														<ChevronUpIcon />
+													</button>
+
+													<button
+														type="button"
+														className="custom-input-button"
+														onClick={() => updateMetaInput("nightSeconds", String(getStepperBaseValue(metaInputs.nightSeconds, draftLobbySettings.metaSettings.nightSeconds) - 1))}
+													>
+														<ChevronDownIcon />
+													</button>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<div className="settings-row">
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.tieBehavior")}</span>
+											<select
+												className="custom-dropdown"
+												value={draftLobbySettings.metaSettings.tieBehavior}
+												onChange={(e) =>
+													applyMetaSetting("tieBehavior", e.target.value as MetaSettings["tieBehavior"])
+												}
+											>
+												{TieBehavior.map((behavior) => (
+													<option key={behavior} value={behavior}>
+														{t(`pages.gameLobby.settings.dropdown.${behavior}`)}
+													</option>
+												))}
+											</select>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.roleDistributionMode")}</span>
+											<select
+												className="custom-dropdown"
+												value={draftLobbySettings.metaSettings.roleDistributionMode}
+												onChange={(e) =>
+													applyMetaSetting(
+														"roleDistributionMode",
+														e.target.value as MetaSettings["roleDistributionMode"]
+													)
+												}
+											>
+												{RoleDistributionMode.map((mode) => (
+													<option key={mode} value={mode}>
+														{t(`pages.gameLobby.settings.dropdown.${mode}`)}
+													</option>
+												))}
+											</select>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.voteVisibility")}</span>
+											<select
+												className="custom-dropdown"
+												value={draftLobbySettings.metaSettings.voteCountVisibility}
+												onChange={(e) =>
+													applyMetaSetting(
+														"voteCountVisibility",
+														e.target.value as MetaSettings["voteCountVisibility"]
+													)
+												}
+											>
+												{VoteCountVisibility.map((visibility) => (
+													<option key={visibility} value={visibility}>
+														{t(`pages.gameLobby.settings.dropdown.${visibility}`)}
+													</option>
+												))}
+											</select>
+										</div>
+									</div>
+
+									<div className="settings-row">
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.anonymousVoting")}</span>
+											<button
+												type="button"
+												className="custom-button small_button"
+												onClick={() =>
+													applyMetaSetting(
+														"anonymousVoting",
+														!draftLobbySettings.metaSettings.anonymousVoting
+													)
+												}
+											>
+												{draftLobbySettings.metaSettings.anonymousVoting ? t("common.on") : t("common.off")}
+											</button>
+										</div>
+
+										<div className="setting-card">
+											<span className="setting-label">{t("pages.gameLobby.settings.roleReveal")}</span>
+											<button
+												type="button"
+												className="custom-button small_button"
+												onClick={() =>
+													applyMetaSetting(
+														"roleRevealOnDeath",
+														!draftLobbySettings.metaSettings.roleRevealOnDeath
+													)
+												}
+											>
+												{draftLobbySettings.metaSettings.roleRevealOnDeath ? t("common.on") : t("common.off")}
+											</button>
 										</div>
 									</div>
 								</div>
 
-								<div className="settings-row">
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.dayTime")}</span>
+								{(roleAlignment as readonly RoleAlignment[]).map((alignment) => (
+									<div className="settings-section" key={alignment}>
+										<h3 className="glow">{t(`pages.gameLobby.settings.alignments.${alignment}`)}</h3>
 
-										<div className="custom-input-stepper">
-											<input
-												className="input"
-												type="number"
-												value={metaInputs.daySeconds}
-												onChange={(e) => updateMetaInput("daySeconds", e.target.value)}
-												onBlur={() => flushMetaInput("daySeconds")}
-											/>
+										<div className="settings-row">
+											{rolesByAlignment[alignment].map((role) => {
+												const currentCount = draftLobbySettings.roleSettings[role.id] ?? 0;
+												const isEnabled = currentCount > 0;
+												const isWeightedRandom =
+													draftLobbySettings.metaSettings.roleDistributionMode === "weighted_random";
 
-											<div className="input-controls">
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("daySeconds", String((Number(metaInputs.daySeconds) || draftLobbySettings.metaSettings.daySeconds) + 1))}><ChevronUpIcon className="h-4 w-4" /></button>
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("daySeconds", String((Number(metaInputs.daySeconds) || draftLobbySettings.metaSettings.daySeconds) - 1))}><ChevronDownIcon className="h-4 w-4" /></button>
-											</div>
+												return (
+													<div key={role.id} className="setting-card">
+														<span className="setting-label setting-label-role">{t(`roles.keys.${role.key}`)}</span>
+
+														{isWeightedRandom ? (
+															<button
+																type="button"
+																className="custom-button small_button"
+																onClick={() => applyRoleSetting(role.id, isEnabled ? 0 : 1)}
+															>
+																{isEnabled ? t("common.on") : t("common.off")}
+															</button>
+														) : (
+															<div className="custom-input-stepper">
+																<input
+																	className="input"
+																	type="number"
+																	min={0}
+																	value={currentCount}
+																	onChange={(e) => applyRoleSetting(role.id, e.target.value)}
+																/>
+
+																<div className="input-controls">
+																	<button
+																		type="button"
+																		className="custom-input-button"
+																		onClick={() => applyRoleSetting(role.id, currentCount + 1)}
+																	>
+																		<ChevronUpIcon />
+																	</button>
+
+																	<button
+																		type="button"
+																		className="custom-input-button"
+																		onClick={() => applyRoleSetting(role.id, Math.max(0, currentCount - 1))}
+																	>
+																		<ChevronDownIcon />
+																	</button>
+																</div>
+															</div>
+														)}
+													</div>
+												);
+											})}
 										</div>
 									</div>
-
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.votingTime")}</span>
-
-										<div className="custom-input-stepper">
-											<input
-												className="input"
-												type="number"
-												value={metaInputs.votingSeconds}
-												onChange={(e) => updateMetaInput("votingSeconds", e.target.value)}
-												onBlur={() => flushMetaInput("votingSeconds")}
-											/>
-
-											<div className="input-controls">
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("votingSeconds", String((Number(metaInputs.votingSeconds) || draftLobbySettings.metaSettings.votingSeconds) + 1))}><ChevronUpIcon className="h-4 w-4" /></button>
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("votingSeconds", String((Number(metaInputs.votingSeconds) || draftLobbySettings.metaSettings.votingSeconds) - 1))}><ChevronDownIcon className="h-4 w-4" /></button>
-											</div>
-										</div>
-									</div>
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.nightTime")}</span>
-
-										<div className="custom-input-stepper">
-											<input
-												className="input"
-												type="number"
-												value={metaInputs.nightSeconds}
-												onChange={(e) => updateMetaInput("nightSeconds", e.target.value)}
-												onBlur={() => flushMetaInput("nightSeconds")}
-											/>
-
-											<div className="input-controls">
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("nightSeconds", String((Number(metaInputs.nightSeconds) || draftLobbySettings.metaSettings.nightSeconds) + 1))}><ChevronUpIcon className="h-4 w-4" /></button>
-												<button type="button" className="custom-input-button" onClick={() => updateMetaInput("nightSeconds", String((Number(metaInputs.nightSeconds) || draftLobbySettings.metaSettings.nightSeconds) - 1))}><ChevronDownIcon className="h-4 w-4" /></button>
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<div className="settings-row">
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.tieBehavior")}</span>
-										<select
-											className="custom-dropdown"
-											value={draftLobbySettings.metaSettings.tieBehavior}
-											onChange={(e) =>
-												applyMetaSetting("tieBehavior", e.target.value as MetaSettings["tieBehavior"])
-											}
-										>
-											<option value="no_one_dies">{t("pages.gameLobby.settings.dropdown.noOneDies")}</option>
-											<option value="random_among_tied">{t("pages.gameLobby.settings.dropdown.randomTied")}</option>
-											<option value="revote">{t("pages.gameLobby.settings.dropdown.revote")}</option>
-										</select>
-									</div>
-
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.voteVisibility")}</span>
-										<select
-											className="custom-dropdown"
-											value={draftLobbySettings.metaSettings.voteCountVisibility}
-											onChange={(e) =>
-												applyMetaSetting(
-													"voteCountVisibility",
-													e.target.value as MetaSettings["voteCountVisibility"]
-												)
-											}
-										>
-											<option value="never">{t("pages.gameLobby.settings.dropdown.never")}</option>
-											<option value="end">{t("pages.gameLobby.settings.dropdown.end")}</option>
-											<option value="live">{t("pages.gameLobby.settings.dropdown.live")}</option>
-										</select>
-									</div>
-								</div>
-
-								<div className="settings-row">
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.anonymousVoting")}</span>
-										<button
-											type="button"
-											className="custom-button small_button"
-											onClick={() =>
-												applyMetaSetting(
-													"anonymousVoting",
-													!draftLobbySettings.metaSettings.anonymousVoting
-												)
-											}
-										>
-											{draftLobbySettings.metaSettings.anonymousVoting ? t("common.on") : t("common.off")}
-										</button>
-									</div>
-
-									<div className="setting-card">
-										<span className="setting-label">{t("pages.gameLobby.settings.roleReveal")}</span>
-										<button
-											type="button"
-											className="custom-button small_button"
-											onClick={() =>
-												applyMetaSetting(
-													"roleRevealOnDeath",
-													!draftLobbySettings.metaSettings.roleRevealOnDeath
-												)
-											}
-										>
-											{draftLobbySettings.metaSettings.roleRevealOnDeath ? t("common.on") : t("common.off")}
-										</button>
-									</div>
-								</div>
+								))}
 							</div>
 						</div>
 					</div>

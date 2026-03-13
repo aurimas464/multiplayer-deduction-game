@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { Prisma, User as PrismaUser } from "@prisma/client";
 
 import { User } from "../types/entities/user";

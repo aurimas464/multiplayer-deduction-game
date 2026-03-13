@@ -60,15 +60,23 @@ export const lt = {
 				tieBehavior: "Tie Behavior",
 				voteVisibility: "Vote visibility",
 				dropdown: {
-					noOneDies: "No one dies",
-					randomTied: "Random among tied",
+					no_one_dies: "No one dies",
+					random_among_tied: "Random among tied",
 					revote: "Revote",
 					never: "Never",
 					end: "End of voting",
-					live: "Live"
+					live: "Live",
+					exact: "Exact",
+					weighted_random: "Weighted random"
+				},
+				alignments: {
+					commune: "Commune",
+					vampire: "Vampire",
+					neutral: "Neutral"
 				},
 				anonymousVoting: "Anonymous voting",
-				roleReveal: "Role reveal on death"
+				roleReveal: "Role reveal on death",
+				roleDistributionMode: "Distribution mode",
 			}
 		}
 	},
@@ -120,6 +128,23 @@ export const lt = {
 				loadingMessage: "Joining game..."
 			}
 		}
+	},
+	roles: {
+		keys: {
+			vampire: "Vampire",
+			count: "Count",
+			bloodBank: "Blood Bank",
+			commoner: "Commoner",
+			visionary: "Visionary",
+			vigilante: "Vigilante",
+			watchman: "Watchman",
+			jailor: "Jailor",
+			priest: "Priest",
+			jester: "Jester",
+			serialKiller: "Serial Killer",
+			chronicler: "Chronicler"
+		}
+
 	},
 	errors: {
 		specific: {

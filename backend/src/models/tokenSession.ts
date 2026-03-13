@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { Prisma, Session as SessionPrisma } from "@prisma/client";
 import { TokenSession, CreateTokenSession } from "../types/entities/tokenSession";
 

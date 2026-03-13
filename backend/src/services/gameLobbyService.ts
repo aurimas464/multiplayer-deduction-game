@@ -3,7 +3,7 @@ import { AppError, ErrorCode } from "../types";
 import { GameModelTransaction } from "../models/game";
 import { ParticipantModelTransaction } from "../models/participant";
 import type { Participant } from "../types/entities/participant";
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { MetaSettings } from "../types/websocket";
 
 const MAX_LOBBY_SIZE = 20;
@@ -12,7 +12,7 @@ const MIN_PERIOD_SECONDS = 10;
 const MAX_PERIOD_SECONDS = 999;
 
 class GameLobbyService {
-	public async claimSeat(gameId: number, playerId: number): Promise<Participant> {
+	async claimSeat(gameId: number, playerId: number): Promise<Participant> {
 		return prisma.$transaction(async (tx) => {
 			const gamesModel = GameModelTransaction(tx);
 			const participants = ParticipantModelTransaction(tx);
@@ -55,7 +55,7 @@ class GameLobbyService {
 		});
 	}
 
-	public async changeSeat(playerId: number, gameId: number, newSeatNr: number): Promise<void> {
+	async changeSeat(playerId: number, gameId: number, newSeatNr: number): Promise<void> {
 		return prisma.$transaction(async (tx) => {
 			const gamesModel = GameModelTransaction(tx);
 			const participantsModel = ParticipantModelTransaction(tx);
@@ -98,7 +98,7 @@ class GameLobbyService {
 		});
 	}
 
-	public async updateLobbySettings(playerId: number, gameId: number, metaSettings: Partial<MetaSettings>): Promise<boolean> {
+	async updateLobbySettings(playerId: number, gameId: number, metaSettings: Partial<MetaSettings>): Promise<boolean> {
 		return prisma.$transaction(async (tx) => {
 			const gamesModel = GameModelTransaction(tx);
 

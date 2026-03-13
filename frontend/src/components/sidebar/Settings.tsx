@@ -211,7 +211,7 @@ const Settings = () => {
 			setCurrentSettings(originalSettingsRef.current);
 			revertContextToOriginal();
 
-			const code = response.errors[0].code;
+			const code = response.errors?.[0]?.code;
 			const errorMessage = errorMapper(code, t, language);
 			showPopup({
 				type: "error",

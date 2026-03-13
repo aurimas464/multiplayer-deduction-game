@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { Bot as BotPrisma, Prisma } from "@prisma/client";
 import { Bot } from "../types/entities/bot";
 

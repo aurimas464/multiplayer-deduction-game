@@ -38,7 +38,7 @@ const LoadingPopup = ({ popup, onClose }: Props) => {
 			height={200}
 			minimizable={false}
 			closable={false}
-			icon={<ArrowPathIcon className="w-5 h-5" />}
+			icon={<ArrowPathIcon/>}
 		>
 			<div className="popup-content-center-flex">
 				<ArrowPathIcon className="loading-popup-icon" />

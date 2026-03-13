@@ -239,21 +239,19 @@ export class WebSocketGameSession {
 		return true;
 	}
 
-	public updateRoleSettings(gameId: number, patch: Partial<RoleSettings>): boolean {
+	public updateRoleSettings(gameId: number, patch: RoleSettings): boolean {
 		const session = this.sessions.get(gameId);
 		if (!session) return false;
 
-		/*
-		session.roleSettings = {
-			...session.roleSettings,
-			...patch,
-		};*/
+		for (const [roleId, count] of Object.entries(patch)) {
+			session.roleSettings[Number(roleId)] = count;
+		}
 
 		session.lastActiveAt = Date.now();
 		this.notify(gameId);
 		return true;
 	}
-
+	
 	public setReady(gameId: number, playerId: number, isReady: boolean): boolean {
 		const session = this.sessions.get(gameId);
 		if (!session) return false;

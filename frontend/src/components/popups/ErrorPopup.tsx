@@ -20,7 +20,7 @@ const ErrorPopup = ({ popup, onClose }: Props) => {
 			autoCloseDelay={popup.autoCloseDelay}
 			minimizable={false}
 			closable={false}
-			icon={<XCircleIcon className="w-5 h-5" />}
+			icon={<XCircleIcon/>}
 		>
 			<div className="popup-content-center-flex">
 				{popup.payload.message && <p className="error-message">{popup.payload.message}</p>}

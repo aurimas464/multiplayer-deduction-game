@@ -21,7 +21,7 @@ type UseLobbySettingsParams = {
 	lobbyState: LobbyStateData;
 	onSaveSettings: (
 		metaSettings: Partial<MetaSettings>,
-		roleSettings: Partial<RoleSettings>,
+		roleSettings: RoleSettings,
 		handlers: {
 			onSuccess: () => void;
 			onReject: () => void;
@@ -30,40 +30,54 @@ type UseLobbySettingsParams = {
 	) => void;
 };
 
+type DraftLobbySettings = {
+	metaSettings: MetaSettings;
+	roleSettings: RoleSettings;
+};
+
 export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySettingsParams) => {
-	const latestLobbyStateRef = useRef<LobbyStateData>(lobbyState);
-
-	const [draftLobbySettings, setDraftLobbySettings] = useState<{ metaSettings: MetaSettings; roleSettings: RoleSettings }>({ metaSettings: lobbyState.metaSettings, roleSettings: lobbyState.roleSettings});
-	const latestDraftSettingsRef = useRef<{ metaSettings: MetaSettings; roleSettings: RoleSettings }>({ metaSettings: lobbyState.metaSettings, roleSettings: lobbyState.roleSettings});
-
-	const [metaInputs, setMetaInputs] = useState<MetaInputsState>({
-		maxPlayers: String(lobbyState.metaSettings.maxPlayers),
-		minPlayers: String(lobbyState.metaSettings.minPlayers),
-		daySeconds: String(lobbyState.metaSettings.daySeconds),
-		votingSeconds: String(lobbyState.metaSettings.votingSeconds),
-		nightSeconds: String(lobbyState.metaSettings.nightSeconds)
+	const createDraftLobbySettings = (state: LobbyStateData): DraftLobbySettings => ({
+		metaSettings: state.metaSettings,
+		roleSettings: state.roleSettings
 	});
+
+	const createMetaInputs = (metaSettings: MetaSettings): MetaInputsState => ({
+		maxPlayers: String(metaSettings.maxPlayers),
+		minPlayers: String(metaSettings.minPlayers),
+		daySeconds: String(metaSettings.daySeconds),
+		votingSeconds: String(metaSettings.votingSeconds),
+		nightSeconds: String(metaSettings.nightSeconds)
+	});
+
+	const latestLobbyStateRef = useRef<LobbyStateData>(lobbyState);
+	const latestDraftSettingsRef = useRef<DraftLobbySettings>(createDraftLobbySettings(lobbyState));
+
+	const [draftLobbySettings, setDraftLobbySettings] = useState<DraftLobbySettings>(
+		createDraftLobbySettings(lobbyState)
+	);
+
+	const [metaInputs, setMetaInputs] = useState<MetaInputsState>(
+		createMetaInputs(lobbyState.metaSettings)
+	);
 
 	const inputTimeoutsRef = useRef<Partial<Record<NumericMetaInputKey, number>>>({});
 	const savingSettingsRef = useRef(false);
 	const saveTimeoutRef = useRef<number | null>(null);
 
 	useEffect(() => {
+		latestLobbyStateRef.current = lobbyState;
+	}, [lobbyState]);
+
+	useEffect(() => {
 		latestDraftSettingsRef.current = draftLobbySettings;
 	}, [draftLobbySettings]);
 
 	useEffect(() => {
-		setDraftLobbySettings({metaSettings: lobbyState.metaSettings, roleSettings: lobbyState.roleSettings});
+		setDraftLobbySettings(createDraftLobbySettings(lobbyState));
 	}, [lobbyState.metaSettings, lobbyState.roleSettings]);
 
 	useEffect(() => {
-		setMetaInputs({
-			maxPlayers: String(draftLobbySettings.metaSettings.maxPlayers),
-			minPlayers: String(draftLobbySettings.metaSettings.minPlayers),
-			daySeconds: String(draftLobbySettings.metaSettings.daySeconds),
-			votingSeconds: String(draftLobbySettings.metaSettings.votingSeconds),
-			nightSeconds: String(draftLobbySettings.metaSettings.nightSeconds)
-		});
+		setMetaInputs(createMetaInputs(draftLobbySettings.metaSettings));
 	}, [draftLobbySettings.metaSettings]);
 
 	useEffect(() => {
@@ -80,14 +94,14 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 		};
 	}, []);
 
-	const getChangedMetaSettings = (current: MetaSettings, next: MetaSettings) => {
+	const getChangedMetaSettings = (current: MetaSettings, next: MetaSettings): Partial<MetaSettings> => {
 		const changed: Partial<MetaSettings> = {};
 
 		const assignIfChanged = <K extends keyof MetaSettings>(key: K) => {
 			if (current[key] !== next[key]) {
 				changed[key] = next[key];
 			}
-		};
+		}
 
 		for (const key of Object.keys(next) as Array<keyof MetaSettings>) {
 			assignIfChanged(key);
@@ -96,37 +110,39 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 		return changed;
 	};
 
-	const getChangedRoleSettings = (current: RoleSettings, next: RoleSettings) => {
-		const changed: Partial<RoleSettings> = {};
+	const getChangedRoleSettings = (current: RoleSettings, next: RoleSettings): RoleSettings => {
+		const changed: RoleSettings = {} as RoleSettings;
+		const keys = new Set([...Object.keys(current), ...Object.keys(next)]);
 
-		const assignIfChanged = <K extends keyof RoleSettings>(key: K) => {
-			if (current[key] !== next[key]) {
-				changed[key] = next[key];
+		for (const key of keys) {
+			const numericKey = Number(key);
+			const currentValue = current[numericKey];
+			const nextValue = next[numericKey];
+
+			if (currentValue !== nextValue) {
+				changed[numericKey] = nextValue ?? 0;
 			}
-		};
-
-		for (const key of Object.keys(next) as Array<keyof RoleSettings>) {
-			assignIfChanged(key);
 		}
 
 		return changed;
 	};
 
-	const getChangedLobbySettings = (current: { metaSettings: MetaSettings; roleSettings: RoleSettings }, next: { metaSettings: MetaSettings; roleSettings: RoleSettings }) => {
-		const metaSettings = getChangedMetaSettings(current.metaSettings, next.metaSettings);
-		const roleSettings = getChangedRoleSettings(current.roleSettings, next.roleSettings);
-		return { metaSettings, roleSettings };
+	const getChangedLobbySettings = (current: DraftLobbySettings, next: DraftLobbySettings) => {
+		return {
+			metaSettings: getChangedMetaSettings(current.metaSettings, next.metaSettings),
+			roleSettings: getChangedRoleSettings(current.roleSettings, next.roleSettings)
+		};
 	};
 
-	const scheduleLobbySettingsSave = (nextSettings: { metaSettings: MetaSettings; roleSettings: RoleSettings }) => {
+	const scheduleLobbySettingsSave = (nextSettings: DraftLobbySettings) => {
 		if (saveTimeoutRef.current) {
 			window.clearTimeout(saveTimeoutRef.current);
 		}
 
 		saveTimeoutRef.current = window.setTimeout(() => {
-			const currentSettings: { metaSettings: MetaSettings; roleSettings: RoleSettings } = { metaSettings: latestLobbyStateRef.current.metaSettings, roleSettings: latestLobbyStateRef.current.roleSettings};
-
+			const currentSettings = createDraftLobbySettings(latestLobbyStateRef.current);
 			const changed = getChangedLobbySettings(currentSettings, nextSettings);
+
 			const hasMetaChanges = Object.keys(changed.metaSettings).length > 0;
 			const hasRoleChanges = Object.keys(changed.roleSettings).length > 0;
 
@@ -141,10 +157,7 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 				},
 				onReject: () => {
 					savingSettingsRef.current = false;
-					setDraftLobbySettings({
-						metaSettings: latestLobbyStateRef.current.metaSettings,
-						roleSettings: latestLobbyStateRef.current.roleSettings
-					});
+					setDraftLobbySettings(createDraftLobbySettings(latestLobbyStateRef.current));
 				},
 				onTimeout: () => {
 					savingSettingsRef.current = false;
@@ -155,9 +168,11 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 
 	const updateDraftMetaSetting = <K extends keyof MetaSettings>(key: K, value: MetaSettings[K]) => {
 		setDraftLobbySettings((prev) => {
-			if (prev.metaSettings[key] === value) return prev;
+			if (prev.metaSettings[key] === value) {
+				return prev;
+			}
 
-			const nextSettings: { metaSettings: MetaSettings; roleSettings: RoleSettings } = {
+			const nextSettings: DraftLobbySettings = {
 				...prev,
 				metaSettings: {
 					...prev.metaSettings,
@@ -168,6 +183,32 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 			scheduleLobbySettingsSave(nextSettings);
 			return nextSettings;
 		});
+	};
+
+	const updateDraftRoleSetting = (roleId: number, value: number) => {
+		setDraftLobbySettings((prev) => {
+			const nextSettings: DraftLobbySettings = {
+				...prev,
+				roleSettings: {
+					...prev.roleSettings,
+					[roleId]: Math.max(0, value)
+				}
+			};
+
+			scheduleLobbySettingsSave(nextSettings);
+			return nextSettings;
+		});
+	};
+
+	const applyRoleSetting = (roleId: number, rawValue: string | number) => {
+		const parsed = typeof rawValue === "number" ? rawValue : Number(rawValue);
+
+		if (!Number.isFinite(parsed)) {
+			return;
+		}
+
+		const nextValue = Math.max(0, Math.trunc(parsed));
+		updateDraftRoleSetting(roleId, nextValue);
 	};
 
 	const resetMetaInput = (key: NumericMetaInputKey) => {
@@ -250,6 +291,7 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 		}
 
 		switch (key) {
+			case "roleDistributionMode":
 			case "tieBehavior":
 			case "voteCountVisibility":
 			case "anonymousVoting":
@@ -288,5 +330,5 @@ export const useLobbySettings = ({ lobbyState, onSaveSettings }: UseLobbySetting
 		applyMetaSetting(key, metaInputs[key]);
 	};
 
-	return { draftLobbySettings, metaInputs, applyMetaSetting, updateMetaInput, flushMetaInput };
+	return { draftLobbySettings, metaInputs, applyMetaSetting, updateMetaInput, flushMetaInput, applyRoleSetting };
 };

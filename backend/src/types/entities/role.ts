@@ -12,3 +12,12 @@ export const roleSchema = z.object({
 }).strip();
 
 export type Role = z.infer<typeof roleSchema>;
+
+export const responseRoleSchema = roleSchema.omit({
+	createdAt: true,
+	updatedAt: true,
+}).strip();
+
+export type ResponseRole = z.infer<typeof responseRoleSchema>;
+
+export const responseRolesSchema = z.array(responseRoleSchema);

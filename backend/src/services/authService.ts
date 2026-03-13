@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import config from "../config";
 
 import { UserModel, UserModelTransaction } from "../models/user";

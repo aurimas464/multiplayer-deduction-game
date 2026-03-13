@@ -6,12 +6,14 @@ import cookieParser from "cookie-parser";
 
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
+import roleRoutes from "./routes/roleRoutes";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 import { GameWebSocketServer } from "./websocket/WebSocketServer";
 
-import prisma from "./prisma";
+import prisma from "../prisma/client";
 import { ErrorCode } from "./types/index";
 import config from "./config";
+import { seed } from "../prisma/seed";
 
 const app: Express = express();
 const server = createServer(app);
@@ -45,6 +47,7 @@ app.use(
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/roles", roleRoutes);
 app.use(errorMiddleware);
 
 const wss = new GameWebSocketServer(server, config);
@@ -52,6 +55,7 @@ const wss = new GameWebSocketServer(server, config);
 async function startServer(): Promise<void> {
 	try {
 		await prisma.$connect();
+		await seed();
 
 		const PORT = config.port;
 		server.listen(PORT, () => {

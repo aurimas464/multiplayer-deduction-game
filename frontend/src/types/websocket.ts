@@ -3,6 +3,8 @@ import { ErrorCode, type ErrorDetail } from "./index";
 export const GameStatus = ["lobby", "in_progress", "finished", "cancelled"] as const;
 export const TieBehavior = ["no_one_dies", "random_among_tied", "revote"] as const;
 export const VoteCountVisibility = ["never", "end", "live"] as const;
+export const RoleDistributionMode = ["exact", "weighted_random"] as const;
+export type RoleSettings = Record<number, number>;
 
 export type LobbyPlayer = {
 	playerId: number;
@@ -24,10 +26,7 @@ export type MetaSettings = {
 	voteCountVisibility: typeof VoteCountVisibility[number];
 	anonymousVoting: boolean;
 	roleRevealOnDeath: boolean;
-};
-
-export type RoleSettings = {
-	
+	roleDistributionMode: typeof RoleDistributionMode[number];
 };
 
 export type LobbyStateData = {
@@ -47,7 +46,7 @@ export type ClientMessage =
 	| { type: "RECOVER_GAME" }
 	| { type: "CHANGE_SEAT"; seatNr: number }
 	| { type: "SET_READY"; ready: boolean }
-	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: Partial<RoleSettings> };
+	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: RoleSettings };
 
 export type ServerMessage =
 	| { type: "ERROR"; code: ErrorCode; details?: ErrorDetail[] }

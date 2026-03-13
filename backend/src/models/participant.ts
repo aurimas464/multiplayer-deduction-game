@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { Prisma, Participant as ParticipantPrisma } from "@prisma/client";
 import type { Participant } from "../types/entities/participant";
 

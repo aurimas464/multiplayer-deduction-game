@@ -8,7 +8,7 @@
 
 .lobby-container {
 	width: 100%;
-	max-width: 1000px;
+	max-width: 1100px;
 	height: min(90vh, 900px);
 	min-height: 0;
 	display: grid;
@@ -61,7 +61,7 @@
 .section-grid {
 	min-height: 300px;
 	display: grid;
-	grid-template-rows: 5fr 1fr;
+	grid-template-rows: 10fr 1fr;
 	gap: 1rem;
 }
 
@@ -136,11 +136,11 @@
 	justify-content: center;
 }
 
-.button.lobby-box.success:hover {
+.custom-button.lobby-box.success:hover {
 	background-color: var(--success-text);
 }
 
-.button.lobby-box.error:hover {
+.custom-button.lobby-box.error:hover {
 	background-color: var(--error-text);
 }
 
@@ -183,8 +183,11 @@
 .settings-options {
 	display: flex;
 	flex-direction: column;
-	padding: 0.5rem;
 	overflow-y: auto;
+}
+
+.settings-section{
+	padding: 0.5rem;
 }
 
 .settings-row {
@@ -192,7 +195,7 @@
 	flex-wrap: wrap;
 	flex-direction: row;
 	gap: 1rem;
-	padding: 0.5rem;
+	padding: 0.25rem;
 	align-items: center;
 	justify-content: center;
 }
@@ -208,7 +211,18 @@
 .setting-label {
 	font-family: "Cinzel";
 	font-weight: 700;
-	font-size: 0.8rem;
+	font-size: 0.7rem;
 	white-space: nowrap;
 	text-transform: uppercase;
+}
+
+.setting-label-role {
+	font-size: 0.75rem;
+	cursor: pointer;
+	color: var(--accent-primary-light);
+	transition: text-shadow 0.25s ease;
+}
+
+.setting-label-role:hover {
+	text-shadow: 0 0 12px var(--accent-primary), 0 0 24px var(--accent-primary-dark);
 }

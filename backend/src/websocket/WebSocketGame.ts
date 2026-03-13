@@ -4,6 +4,7 @@ import { WebSocketGameSession } from "./WebSocketGameSession";
 import GameService from "../services/gameService";
 import UserService from "../services/userService";
 import GameLobbyService from "../services/gameLobbyService";
+import RoleService from "../services/roleService";
 
 export class WebSocketGame {
 	private readonly sessions: WebSocketGameSession;
@@ -32,6 +33,7 @@ export class WebSocketGame {
 			voteCountVisibility: lobby.voteCountVisibility,
 			anonymousVoting: lobby.anonymousVoting,
 			roleRevealOnDeath: lobby.roleRevealOnDeath,
+			roleDistributionMode: lobby.roleDistributionMode
 		}, {});
 	}
 
@@ -97,6 +99,7 @@ export class WebSocketGame {
 				voteCountVisibility: created.voteCountVisibility,
 				anonymousVoting: created.anonymousVoting,
 				roleRevealOnDeath: created.roleRevealOnDeath,
+				roleDistributionMode: created.roleDistributionMode
 			}, {});
 			this.sendMessage(ws, { type: "CREATE_GAME_OK", gameCode: created.gameCode } as ServerMessage);
 		} else {
@@ -226,7 +229,7 @@ export class WebSocketGame {
 		this.sendMessage(ws, { type: "SET_READY_OK" });
 	}
 
-	private async onUpdateLobbySettings(ws: ConnectedUserSocket, metaSettings: Partial<MetaSettings>, _roleSettings: Partial<RoleSettings>): Promise<void> {
+	private async onUpdateLobbySettings(ws: ConnectedUserSocket, metaSettings: Partial<MetaSettings>, roleSettings: RoleSettings): Promise<void> {
 		const playerId = ws.userToken?.playerId;
 		const game = ws.game;
 		if (!playerId) {
@@ -237,13 +240,20 @@ export class WebSocketGame {
 		}
 		const [, gameId] = game;
 
-		const updated = await GameLobbyService.updateLobbySettings(playerId, gameId, metaSettings);
-		if (!updated) {
+		const updatedLobby = await GameLobbyService.updateLobbySettings(playerId, gameId, metaSettings);
+		if (!updatedLobby) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+		const updatedRole = await RoleService.updateRoleSettings(playerId, gameId, roleSettings);
+		if (!updatedRole) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
 
 		await this.ensureSession(gameId);
 		if (!this.sessions.updateMetaSettings(gameId, metaSettings)) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
+		if (!this.sessions.updateRoleSettings(gameId, roleSettings)) {
 			throw new AppError(ErrorCode.GAME_NOT_FOUND);
 		}
 

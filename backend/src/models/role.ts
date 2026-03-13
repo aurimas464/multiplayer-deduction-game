@@ -1,4 +1,4 @@
-import prisma from "../prisma";
+import prisma from "../../prisma/client";
 import type { Role as RolePrisma, Prisma } from "@prisma/client";
 import { Role } from "../types/entities/role";
 
@@ -14,6 +14,17 @@ class Model {
 			createdAt: r.createdAt,
 			updatedAt: r.updatedAt,
 		};
+	}
+
+	public async getRoles(): Promise<Role[]> {
+		const roles = await this.db.role.findMany({
+			orderBy: [
+				{ alignment: "asc" },
+				{ id: "asc" }
+			]
+		});
+
+		return roles.map((r) => this.mapRole(r));
 	}
 }
 

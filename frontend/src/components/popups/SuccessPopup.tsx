@@ -20,7 +20,7 @@ const SuccessPopup = ({ popup, onClose }: Props) => {
 			autoCloseDelay={popup.autoCloseDelay}
 			minimizable={false}
 			closable={false}
-			icon={<CheckCircleIcon className="w-5 h-5" />}
+			icon={<CheckCircleIcon/>}
 		>
 			<div className="popup-content-center-flex">
 				{popup.payload.message && <p className="success-message">{popup.payload.message}</p>}

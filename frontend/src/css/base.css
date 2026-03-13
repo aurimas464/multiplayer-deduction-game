@@ -201,21 +201,22 @@
 	background: none;
 	color: var(--text-primary);
 	cursor: pointer;
-	transition: background-color 0.25s ease;
 	border: 2px solid var(--accent-primary);
 	border-radius: 5px;
 	position: relative;
 	font-family: "Cinzel";
 	font-weight: 600;
 	z-index: 102;
+	transition: background-color 0.25s ease, transform 0.15s ease, opacity 0.2s ease;
 }
 
-.custom-button.small_button{
-	height: 1.5rem;
-	width: 4rem;
+.custom-button:hover:not([disabled]) {
+	background-color: var(--hover-gray);
+	transform: translateY(-2px);
 }
 
-.custom-button:hover {
+.custom-button:active:not([disabled]) {
+	transform: translateY(1px);
 	background-color: var(--hover-gray);
 }
 
@@ -225,6 +226,17 @@
 	color: var(--text-primary);
 	background-color: var(--bg-secondary);
 	pointer-events: none;
+	transform: none;
+}
+
+.custom-button.small_button {
+	height: 1.5rem;
+	width: 6rem;
+}
+
+.custom-button.small_button:hover:not([disabled]),
+.custom-button.small_button:active:not([disabled]) {
+	transform: none;
 }
 
 .custom-input-stepper {
@@ -290,6 +302,13 @@
 	background: var(--accent-primary-dark);
 }
 
+.glow {
+	text-shadow: 0 0 12px var(--accent-primary), 0 0 24px var(--accent-primary-dark);
+}
+
+.line {
+	border-bottom: 1px solid var(--accent-primary);
+}
 
 .icon-picker {
 	display: flex;

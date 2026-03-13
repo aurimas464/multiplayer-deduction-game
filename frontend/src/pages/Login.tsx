@@ -48,7 +48,7 @@ const Login = () => {
 			return;
 		}
 
-		const code = response.errors[0].code;
+		const code = response.errors?.[0]?.code;
 		setError(errorMapper(code, t, language));
 	};
 

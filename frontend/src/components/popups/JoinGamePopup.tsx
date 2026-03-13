@@ -144,7 +144,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 			height={popup.height ?? 200}
 			minimizable={!isJoining}
 			closable={!isJoining}
-			icon={<UserGroupIcon className="w-5 h-5" />}
+			icon={<UserGroupIcon/>}
 		>
 			<div className="popup-content-center-flex">
 				<h2>{t("components.popups.joinGame.gameCode")}</h2>

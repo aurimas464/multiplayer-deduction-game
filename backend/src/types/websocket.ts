@@ -2,7 +2,7 @@ import type WebSocket from "ws";
 import type { JwtPayload } from "./config";
 import { z } from "zod";
 import { ErrorCode } from "./index";
-import { TieBehavior, VoteCountVisibility } from "../types/entities/game";
+import { RoleDistributionMode, TieBehavior, VoteCountVisibility } from "../types/entities/game";
 
 export type ConnectedUserSocket = WebSocket & {
 	userToken?: JwtPayload;
@@ -33,12 +33,14 @@ export const metaSettingsSchema = z.object({
 	tieBehavior: z.enum(TieBehavior),
 	voteCountVisibility: z.enum(VoteCountVisibility),
 	anonymousVoting: z.boolean(),
-	roleRevealOnDeath: z.boolean()
+	roleRevealOnDeath: z.boolean(),
+	roleDistributionMode: z.enum(RoleDistributionMode)
 }).strict();
 
-export const roleSettingsSchema = z.object({
-
-}).strict();
+export const roleSettingsSchema = z.record(
+	z.number().min(0),
+	z.number().min(0)
+);
 
 export type LobbyPlayer = z.infer<typeof lobbyPlayerSchema>;
 export type MetaSettings = z.infer<typeof metaSettingsSchema>;
@@ -115,7 +117,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 	z.object({
 		type: z.literal("UPDATE_LOBBY_SETTINGS"),
 		metaSettings: metaSettingsSchema.partial(),
-		roleSettings: roleSettingsSchema.partial(),
+		roleSettings: roleSettingsSchema,
 	}).strict()
 ]);
 

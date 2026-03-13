@@ -6,7 +6,7 @@ import type { Participant } from "../types/entities/participant";
 import gameLobbyService from "./gameLobbyService";
 
 class GameService {
-	public async createGame(): Promise<Game> {
+	async createGame(): Promise<Game> {
 		for (let attempt = 0; attempt < 5; attempt++) {
 			const gameCode = this.generateGameCode();
 
@@ -21,19 +21,19 @@ class GameService {
 		throw new AppError(ErrorCode.GAME_NOT_CREATED);
 	}
 
-	public async getLobbyMeta(gameId: number): Promise<GameWithParticipants | null> {
+	async getLobbyMeta(gameId: number): Promise<GameWithParticipants | null> {
 		return GameModel.findGameWithParticipants(gameId);
 	}
 
-	public async findByGameIdAndPlayerId(gameId: number, playerId: number): Promise<Participant | null> {
+	async findByGameIdAndPlayerId(gameId: number, playerId: number): Promise<Participant | null> {
 		return ParticipantModel.findByGameIdAndPlayerId(gameId, playerId);
 	}
 
-	public async latestActiveGameForPlayer(playerId: number): Promise<Game | null> {
+	async latestActiveGameForPlayer(playerId: number): Promise<Game | null> {
 		return GameModel.findActiveGameByPlayerId(playerId);
 	}
 
-	public async joinGame(playerId: number, gameCode: string): Promise<Participant> {
+	async joinGame(playerId: number, gameCode: string): Promise<Participant> {
 		const code = gameCode.trim();
 
 		const game = await GameModel.findByGameCode(code);
@@ -52,7 +52,7 @@ class GameService {
 		return gameLobbyService.claimSeat(game.id, playerId);
 	}
 
-	public async leaveGame(playerId: number, gameId: number): Promise<void> {
+	async leaveGame(playerId: number, gameId: number): Promise<void> {
 		await GameModel.removePlayerFromGame(gameId, playerId);
 	}
 
