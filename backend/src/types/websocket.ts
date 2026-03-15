@@ -118,6 +118,10 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
 		type: z.literal("UPDATE_LOBBY_SETTINGS"),
 		metaSettings: metaSettingsSchema.partial(),
 		roleSettings: roleSettingsSchema,
+	}).strict(),
+	z.object({
+		type: z.literal("KICK_PLAYER"),
+		playerId: z.number(),
 	}).strict()
 ]);
 
@@ -181,6 +185,12 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 	}).strict(),
 	z.object({
 		type: z.literal("UPDATE_LOBBY_SETTINGS_OK"),
+	}).strict(),
+	z.object({
+		type: z.literal("KICK_PLAYER_OK"),
+	}).strict(),
+	z.object({
+		type: z.literal("KICKED_FROM_GAME"),
 	}).strict(),
 ]);
 

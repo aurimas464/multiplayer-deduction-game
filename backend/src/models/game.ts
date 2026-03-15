@@ -28,7 +28,7 @@ class Model {
 		});
 	}
 
-	async lockGameForSeatMutation(gameId: number): Promise<{ id: number; status: typeof GameStatus[number]; maxPlayers: number; gameCode: string } | null> {
+	async lockGameForMutation(gameId: number): Promise<{ id: number; status: typeof GameStatus[number]; maxPlayers: number; gameCode: string } | null> {
 		const rows = await this.db.$queryRaw<{ id: number; status: typeof GameStatus[number]; maxPlayers: number; gameCode: string }[]>`
 			SELECT id, status, maxPlayers, gameCode
 			FROM Game

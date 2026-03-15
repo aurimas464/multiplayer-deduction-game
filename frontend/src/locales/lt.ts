@@ -4,6 +4,7 @@ export const lt = {
 	common: {
 		save: "Save",
 		cancel: "Cancel",
+		info: "Info",
 		error: "Error",
 		success: "Success",
 		loading: "Loading...",
@@ -50,6 +51,7 @@ export const lt = {
 			leave: "Leave",
 			unready: "Unready",
 			players: "Players",
+			kickedFromGame: "You have been kicked from the game",
 			settings: {
 				title: "Settings",
 				maxPlayers: "Max players in lobby",

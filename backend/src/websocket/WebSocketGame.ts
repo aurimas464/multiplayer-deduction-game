@@ -83,6 +83,10 @@ export class WebSocketGame {
 			case "UPDATE_LOBBY_SETTINGS":
 				await this.onUpdateLobbySettings(ws, msg.metaSettings, msg.roleSettings);
 				return;
+
+			case "KICK_PLAYER":
+				await this.onKickPlayer(ws, msg.playerId);
+				return;
 		}
 	}
 
@@ -274,6 +278,35 @@ export class WebSocketGame {
 		}
 
 		this.sendMessage(ws, { type: "LOBBY_STATE", data: snapshot });
+	}
+
+	private async onKickPlayer(ws: ConnectedUserSocket, targetPlayerId: number): Promise<void> {
+		const playerId = ws.userToken?.playerId;
+		const game = ws.game;
+		if (!playerId) {
+			throw new AppError(ErrorCode.UNAUTHORIZED);
+		}
+		if (!game) {
+			throw new AppError(ErrorCode.NOT_IN_LOBBY);
+		}
+		const [, gameId] = game;
+
+		await GameService.kickPlayer(playerId, targetPlayerId, gameId);
+
+		const session = this.sessions.get(gameId);
+		if (session) {
+			for (const clientSocket of session.sockets) {
+				if (clientSocket.userToken?.playerId === targetPlayerId) {
+					this.sendMessage(clientSocket, { type: "KICKED_FROM_GAME" });
+					this.sessions.leaveSession(clientSocket);
+					break;
+				}
+			}
+		}
+
+		this.sessions.removePlayer(gameId, targetPlayerId);
+
+		this.sendMessage(ws, { type: "KICK_PLAYER_OK" });
 	}
 
 	private broadcastLobbyState(gameId: number): void {

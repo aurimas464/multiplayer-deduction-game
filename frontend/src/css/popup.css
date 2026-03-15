@@ -250,6 +250,12 @@ p {
 	color: var(--success-text);
 }
 
+.info-popup-icon {
+	width: 100px;
+	height: 100px;
+	color: var(--info-text);
+}
+
 .error-popup-icon {
 	width: 100px;
 	height: 100px;

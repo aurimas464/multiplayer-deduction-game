@@ -1,9 +1,11 @@
 import { AppError, ErrorCode } from "../types";
+import { Prisma, PrismaClient } from "@prisma/client";
 import type { Game, GameWithParticipants } from "../types/entities/game";
-import { GameModel } from "../models/game";
-import { ParticipantModel } from "../models/participant";
+import { GameModel, GameModelTransaction } from "../models/game";
+import { ParticipantModel, ParticipantModelTransaction } from "../models/participant";
 import type { Participant } from "../types/entities/participant";
 import gameLobbyService from "./gameLobbyService";
+import prisma from "../../prisma/client";
 
 class GameService {
 	async createGame(): Promise<Game> {
@@ -53,7 +55,46 @@ class GameService {
 	}
 
 	async leaveGame(playerId: number, gameId: number): Promise<void> {
-		await GameModel.removePlayerFromGame(gameId, playerId);
+		return await prisma.$transaction(async (tx) => {
+			const gamesModel = GameModelTransaction(tx);
+
+			const locked = await gamesModel.lockGameForMutation(gameId);
+			if (!locked) {
+				throw new AppError(ErrorCode.GAME_NOT_FOUND);
+			}
+			if (locked.status !== "lobby") {
+				throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
+			}
+
+			await gamesModel.removePlayerFromGame(gameId, playerId);
+		});
+	}
+
+	async kickPlayer(kickerId: number, playerId: number, gameId: number): Promise<void> {
+		return await prisma.$transaction(async (tx) => {
+			const gamesModel = GameModelTransaction(tx);
+			const participants = ParticipantModelTransaction(tx);
+
+			const locked = await gamesModel.lockGameForMutation(gameId);
+			if (!locked) {
+				throw new AppError(ErrorCode.GAME_NOT_FOUND);
+			}
+			if (locked.status !== "lobby") {
+				throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
+			}
+
+			const kickerParticipant = await participants.findByGameIdAndPlayerId(gameId, kickerId);
+			if (!kickerParticipant || kickerParticipant.seatNr !== 1) {
+				throw new AppError(ErrorCode.NOT_GAME_LEADER);
+			}
+
+			const targetParticipant = await participants.findByGameIdAndPlayerId(gameId, playerId);
+			if (!targetParticipant) {
+				throw new AppError(ErrorCode.USER_NOT_FOUND);
+			}
+
+			await gamesModel.removePlayerFromGame(gameId, playerId);
+		});
 	}
 
 	private generateGameCode(): string {

@@ -17,7 +17,7 @@ class GameLobbyService {
 			const gamesModel = GameModelTransaction(tx);
 			const participants = ParticipantModelTransaction(tx);
 
-			const locked = await gamesModel.lockGameForSeatMutation(gameId);
+			const locked = await gamesModel.lockGameForMutation(gameId);
 			if (!locked) {
 				throw new AppError(ErrorCode.GAME_NOT_FOUND);
 			}
@@ -60,7 +60,7 @@ class GameLobbyService {
 			const gamesModel = GameModelTransaction(tx);
 			const participantsModel = ParticipantModelTransaction(tx);
 
-			const locked = await gamesModel.lockGameForSeatMutation(gameId);
+			const locked = await gamesModel.lockGameForMutation(gameId);
 			if (!locked) {
 				throw new AppError(ErrorCode.GAME_NOT_FOUND);
 			}
@@ -137,7 +137,7 @@ class GameLobbyService {
 			}
 
 			if (metaSettings.maxPlayers !== undefined) {
-				const locked = await gamesModel.lockGameForSeatMutation(lobby.id);
+				const locked = await gamesModel.lockGameForMutation(lobby.id);
 				if (!locked) {
 					throw new AppError(ErrorCode.GAME_NOT_FOUND);
 				}

@@ -10,6 +10,7 @@
 
 	--error-text: rgb(250, 40, 40);
 	--success-text: rgb(125, 200, 100);
+	--info-text: rgb(100, 150, 255);
 
 	--accent-300: rgb(175, 35, 50);
 	--accent-500: rgb(110, 20, 30);
@@ -32,6 +33,7 @@
 
 	--error-text: rgb(200, 50, 50);
 	--success-text: rgb(50, 140, 70);
+	--info-text: rgb(50, 100, 200);
 
 	--accent-primary-light: var(--accent-700);
 	--accent-primary-dark: var(--accent-300);

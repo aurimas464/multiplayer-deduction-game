@@ -220,8 +220,8 @@
 	background-color: var(--hover-gray);
 }
 
-.custom-button[disabled] {
-	opacity: 0.5;
+.custom-button[disabled], .custom-dropdown[disabled] {
+	opacity: 0.75;
 	cursor: not-allowed;
 	color: var(--text-primary);
 	background-color: var(--bg-secondary);
@@ -237,6 +237,15 @@
 .custom-button.small_button:hover:not([disabled]),
 .custom-button.small_button:active:not([disabled]) {
 	transform: none;
+}
+
+.span-custom-button{
+	cursor: pointer;
+	transition: scale 0.25s ease;
+}
+
+.span-custom-button:hover{
+	scale: 1.25;
 }
 
 .custom-input-stepper {

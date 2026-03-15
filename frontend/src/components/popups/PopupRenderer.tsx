@@ -1,6 +1,7 @@
 import { usePopup } from "../../contexts/PopupContext";
 import SuccessPopup from "./SuccessPopup";
 import ErrorPopup from "./ErrorPopup";
+import InfoPopup from "./InfoPopup";
 import LoadingPopup from "./LoadingPopup";
 import JoinGamePopup from "./JoinGamePopup";
 import type { PopupData } from "../../types/popup";
@@ -17,6 +18,8 @@ const PopupFactory = ({ popup, onClose }: PopupFactoryProps) => {
 			return <SuccessPopup popup={popup as PopupData<"success">} onClose={onClose} />;
 		case "error":
 			return <ErrorPopup popup={popup as PopupData<"error">} onClose={onClose} />;
+		case "info":
+			return <InfoPopup popup={popup as PopupData<"info">} onClose={onClose} />;
 		case "loading":
 			return <LoadingPopup popup={popup as PopupData<"loading">} onClose={onClose} />;
 		case "joinGame":

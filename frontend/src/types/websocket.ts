@@ -46,7 +46,8 @@ export type ClientMessage =
 	| { type: "RECOVER_GAME" }
 	| { type: "CHANGE_SEAT"; seatNr: number }
 	| { type: "SET_READY"; ready: boolean }
-	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: RoleSettings };
+	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: RoleSettings }
+	| { type: "KICK_PLAYER"; playerId: number };
 
 export type ServerMessage =
 	| { type: "ERROR"; code: ErrorCode; details?: ErrorDetail[] }
@@ -63,4 +64,6 @@ export type ServerMessage =
 	| { type: "LOBBY_STATE"; data: LobbyStateData }
 	| { type: "CHANGE_SEAT_OK" }
 	| { type: "SET_READY_OK" }
-	| { type: "UPDATE_LOBBY_SETTINGS_OK" };
+	| { type: "UPDATE_LOBBY_SETTINGS_OK" }
+	| { type: "KICK_PLAYER_OK" }
+	| { type: "KICKED_FROM_GAME" };
