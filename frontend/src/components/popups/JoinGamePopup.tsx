@@ -24,6 +24,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 	const [isJoining, setIsJoining] = useState(false);
 
 	const inputRef = useRef<HTMLInputElement>(null);
+	const joiningLockRef = useRef(false);
 
 	const handleSubmit = () => {
 		const formatted = gameCode.trim().toUpperCase();
@@ -58,7 +59,8 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 				onTimeout: () => {
 					setIsJoining(false);
 				}
-			}
+			},
+			joiningLockRef
 		);
 	};
 

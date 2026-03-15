@@ -55,6 +55,7 @@ const GameLobby = () => {
 	const settingReadyRef = useRef(false);
 	const leavingRef = useRef(false);
 	const kickingRef = useRef(false);
+	const settingsLockRef = useRef(false);
 
 	const { draftLobbySettings, metaInputs, applyMetaSetting, updateMetaInput, flushMetaInput, applyRoleSetting } = useLobbySettings({ lobbyState, onSaveSettings: (metaSettings, roleSettings, handlers) => {
 		if (!isLeader) return;
@@ -80,7 +81,8 @@ const GameLobby = () => {
 				onTimeout: () => {
 					handlers.onTimeout();
 				}
-			}
+			},
+			settingsLockRef
 		);
 	}});
 
@@ -286,9 +288,6 @@ const GameLobby = () => {
 	}, [gameCode, notifyWithLoading, navigate, showPopup, t]);
 
 	const handleChangeSeat = (seatNr: number) => {
-		if (changingSeatRef.current) return;
-		changingSeatRef.current = true;
-
 		notifyWithLoading(
 			{ type: "CHANGE_SEAT", seatNr },
 			{
@@ -301,25 +300,13 @@ const GameLobby = () => {
 						msg.code === ErrorCode.GAME_ALREADY_STARTED ||
 						msg.code === ErrorCode.NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_NOT_FOUND
-					),
-
-				onSuccess: () => {
-					changingSeatRef.current = false;
-				},
-				onReject: () => {
-					changingSeatRef.current = false;
-				},
-				onTimeout: () => {
-					changingSeatRef.current = false;
-				}
-			}
+					)
+			},
+			changingSeatRef
 		);
 	};
 
 	const handleSetReady = (ready: boolean) => {
-		if (settingReadyRef.current) return;
-		settingReadyRef.current = true;
-
 		notifyWithLoading(
 			{ type: "SET_READY", ready },
 			{
@@ -330,18 +317,9 @@ const GameLobby = () => {
 						msg.code === ErrorCode.NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_NOT_FOUND ||
 						msg.code === ErrorCode.ALREADY_IN_GAME
-					),
-
-				onSuccess: () => {
-					settingReadyRef.current = false;
-				},
-				onReject: () => {
-					settingReadyRef.current = false;
-				},
-				onTimeout: () => {
-					settingReadyRef.current = false;
-				}
-			}
+					)
+			},
+			settingReadyRef
 		);
 	};
 
@@ -350,9 +328,6 @@ const GameLobby = () => {
 	};
 
 	const handleLeaveGame = () => {
-		if (leavingRef.current) return;
-		leavingRef.current = true;
-
 		notifyWithLoading(
 			{ type: "LEAVE_GAME" },
 			{
@@ -362,25 +337,14 @@ const GameLobby = () => {
 					(
 						msg.code === ErrorCode.NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_NOT_FOUND
-					),
-
-				onSuccess: () => {
-					leavingRef.current = false;
-					navigate("/home", { replace: true });
-				},
-				onReject: () => {
-					leavingRef.current = false;
-				},
-				onTimeout: () => {
-					leavingRef.current = false;
-				}
-			}
+					)
+			},
+			leavingRef
 		);
 	};
 
 	const handleKickPlayer = (playerId: number) => {
-		if (!isLeader || kickingRef.current) return;
-		kickingRef.current = true;
+		if (!isLeader) return;
 
 		notifyWithLoading(
 			{ type: "KICK_PLAYER", playerId },
@@ -394,17 +358,9 @@ const GameLobby = () => {
 						msg.code === ErrorCode.NOT_GAME_LEADER ||
 						msg.code === ErrorCode.GAME_ALREADY_STARTED ||
 						msg.code === ErrorCode.USER_NOT_FOUND
-					),
-				onSuccess: () => {
-					kickingRef.current = false;
-				},
-				onReject: () => {
-					kickingRef.current = false;
-				},
-				onTimeout: () => {
-					kickingRef.current = false;
-				}
-			}
+					)
+			},
+			kickingRef
 		);
 	};
 

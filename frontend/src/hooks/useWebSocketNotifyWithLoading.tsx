@@ -14,8 +14,11 @@ type NotifyOptions = {
 	onMessage?: (msg: ServerMessage) => void;
 };
 
+type LockRef = ReturnType<typeof useRef<boolean>>;
+
 type Pending = NotifyOptions & {
 	done: boolean;
+	lockRef?: LockRef;
 };
 
 // Hook for using web socket notifications with loading popups
@@ -33,12 +36,16 @@ export const useWebSocketNotifyWithLoading = () => {
 		pending.done = true;
 		pendingsRef.current.delete(loadingPopupId);
 
+		if (pending.lockRef) {
+			pending.lockRef.current = false;
+		}
+
 		setTimeout(() => closePopup(loadingPopupId), 500);
 		fn(pending);
 	}, [closePopup]);
 
 	// Handle messages
-	useEffect(() => { 
+	useEffect(() => {
 		const unsubscribe = subscribe((msg) => {
 			for (const [loadingPopupId, pending] of pendingsRef.current) {
 				if (pending.done) continue;
@@ -65,7 +72,13 @@ export const useWebSocketNotifyWithLoading = () => {
 	}, [subscribe, finish]);
 
 	// Notify with loading
-	const notifyWithLoading = useCallback((message: ClientMessage, opts: NotifyOptions) => {
+	const notifyWithLoading = useCallback((message: ClientMessage, opts: NotifyOptions, lockRef?: LockRef) => {
+		if (lockRef?.current) return false;
+
+		if (lockRef) {
+			lockRef.current = true;
+		}
+
 		let loadingPopupId = "";
 
 		loadingPopupId = showPopup({
@@ -91,6 +104,7 @@ export const useWebSocketNotifyWithLoading = () => {
 			onSuccess: opts.onSuccess,
 			onTimeout: opts.onTimeout,
 			onMessage: opts.onMessage,
+			lockRef,
 			done: false,
 		});
 

@@ -304,7 +304,10 @@ export class WebSocketGame {
 			}
 		}
 
-		this.sessions.removePlayer(gameId, targetPlayerId);
+		await this.ensureSession(gameId);
+		if (!this.sessions.removePlayer(gameId, targetPlayerId)) {
+			throw new AppError(ErrorCode.GAME_NOT_FOUND);
+		}
 
 		this.sendMessage(ws, { type: "KICK_PLAYER_OK" });
 	}

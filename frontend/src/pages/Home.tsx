@@ -20,10 +20,6 @@ const Home = () => {
 	const loadingRef = useRef(false);
 
 	const handleCreateGame = () => {
-		if (loadingRef.current) return;
-		loadingRef.current = true;
-
-
 		notifyWithLoading(
 			{ type: "CREATE_GAME" },
 			{
@@ -40,20 +36,12 @@ const Home = () => {
 					sendMessage({ type: "JOIN_GAME", gameCode: msg.gameCode });
 				},
 				onSuccess: (msg) => {
-					loadingRef.current = false;
-
 					if (msg.type === "JOIN_GAME_OK") {
 						navigate(`/game-lobby/${msg.gameCode}`, { replace: true });
 					}
 				},
-				onReject: () => {
-					loadingRef.current = false;
-				},
-
-				onTimeout: () => {
-					loadingRef.current = false;
-				}
-			}
+			},
+			loadingRef
 		);
 	};
 
