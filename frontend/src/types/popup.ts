@@ -77,6 +77,7 @@ export type PlayerSelectionPopupPayload = {
 		username: string;
 		iconSrc: string;
 	}>;
+	onSubmit: (actionType: Exclude<PlayerActionName, "skip">, targetPlayerId: number) => void;
 };
 
 export type PhaseResultsPopupPayload = {

@@ -150,8 +150,12 @@
 	white-space: nowrap;
 }
 
+.game-action-button:hover:not([disabled]) {
+	transform: translateY(-2px);
+}
+
 .game-action-button:active:not([disabled]) {
-	transform: translateX(-1px);
+	transform: translateY(1px);
 }
 
 .phase-results-panel {

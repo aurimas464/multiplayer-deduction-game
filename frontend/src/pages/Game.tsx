@@ -64,6 +64,7 @@ const Game = () => {
 	const selectionPopupIdRef = useRef<string | null>(null);
 	const roleRevealPopupIdRef = useRef<string | null>(null);
 	const phaseResultsPopupIdRef = useRef<string | null>(null);
+	const actionLoadingPopupIdRef = useRef<string | null>(null);
 	const chatTooltipTimersRef = useRef<Map<number, number>>(new Map());
 	const shownRoleRevealKeyRef = useRef<string | null>(null);
 	const shownPhaseResultKeyRef = useRef<string | null>(null);
@@ -98,6 +99,22 @@ const Game = () => {
 			phaseResultsPopupIdRef.current = null;
 		}
 	}, [closePopup]);
+
+	const closeActionLoadingPopup = useCallback(() => {
+		if (actionLoadingPopupIdRef.current) {
+			closePopup(actionLoadingPopupIdRef.current);
+			actionLoadingPopupIdRef.current = null;
+		}
+	}, [closePopup]);
+
+	const showActionLoadingPopup = useCallback(() => {
+		closeActionLoadingPopup();
+		actionLoadingPopupIdRef.current = showPopup({
+			type: "loading",
+			title: t("common.loading"),
+			payload: {}
+		});
+	}, [closeActionLoadingPopup, showPopup, t]);
 
 	const getPlayerName = useCallback((playerId: number | null | undefined) => {
 		if (playerId === null || playerId === undefined) return t("pages.game.actions.skipAction");
@@ -238,6 +255,7 @@ const Game = () => {
 		closeSelectionPopup();
 		closeRoleRevealPopup();
 		closePhaseResultsPopup();
+		closeActionLoadingPopup();
 
 		const key = `${result.winner}-${result.winnerPlayerIds.join(".")}`;
 		if (shownWinnerKeyRef.current === key) return;
@@ -262,7 +280,7 @@ const Game = () => {
 		};
 
 		navigate("/home", { replace: true, state: { gameFinished } });
-	}, [closePhaseResultsPopup, closeRoleRevealPopup, closeSelectionPopup, navigate]);
+	}, [closeActionLoadingPopup, closePhaseResultsPopup, closeRoleRevealPopup, closeSelectionPopup, navigate]);
 
 	// Keep refs and global cleanup in sync with component lifecycle
 	useEffect(() => {
@@ -274,13 +292,14 @@ const Game = () => {
 			closeSelectionPopup();
 			closeRoleRevealPopup();
 			closePhaseResultsPopup();
+			closeActionLoadingPopup();
 
 			for (const timerId of chatTooltipTimers.values()) {
 				window.clearTimeout(timerId);
 			}
 			chatTooltipTimers.clear();
 		};
-	}, [closePhaseResultsPopup, closeRoleRevealPopup, closeSelectionPopup]);
+	}, [closeActionLoadingPopup, closePhaseResultsPopup, closeRoleRevealPopup, closeSelectionPopup]);
 
 	useEffect(() => {
 		gameStateRef.current = gameState;
@@ -315,6 +334,7 @@ const Game = () => {
 
 					if (msg.code === ErrorCode.INVALID_REQUEST || msg.code === ErrorCode.INVALID_ACTION) {
 						closeSelectionPopup();
+						closeActionLoadingPopup();
 						pendingActionRef.current = false;
 						pendingActionTypeRef.current = null;
 						showPopup({
@@ -336,6 +356,7 @@ const Game = () => {
 
 						if (previousPhaseKey !== nextPhaseKey) {
 							closeSelectionPopup();
+							closeActionLoadingPopup();
 							pendingActionRef.current = false;
 							pendingActionTypeRef.current = null;
 							setSubmittedActionPhaseKey(null);
@@ -397,6 +418,7 @@ const Game = () => {
 
 				case "PLAYER_ACTION_OK":
 					closeSelectionPopup();
+					closeActionLoadingPopup();
 					if (pendingActionRef.current) {
 						setSubmittedActionPhaseKey(pendingActionTypeRef.current === "skip" ? null : phaseKey);
 						pendingActionRef.current = false;
@@ -431,7 +453,7 @@ const Game = () => {
 		});
 
 		return unsubscribe;
-	}, [closeSelectionPopup, describePersonalResult, gameCode, getPhaseDisplayName, navigate, phaseKey, sendMessage, showGameFinishedPopup, showPhaseResultsPopup, showPopup, subscribe, t]);
+	}, [closeActionLoadingPopup, closeSelectionPopup, describePersonalResult, gameCode, getPhaseDisplayName, navigate, phaseKey, sendMessage, showGameFinishedPopup, showPhaseResultsPopup, showPopup, subscribe, t]);
 
 	// Request game state on entry and retry until state is received
 	useEffect(() => {

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import Popup from "./Popup";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
 import type { PopupData } from "../../types/popup";
-import { useWebSocket } from "../../contexts/WebSocketContext";
 import { PlayerActionType, type PlayerActionName } from "../../types/websocket";
 import { useTranslation } from "../../hooks/useTranslation";
 
@@ -12,8 +11,7 @@ type Props = {
 };
 
 const PlayerSelectionPopup = ({ popup, onClose }: Props) => {
-	const { actionType, actionLabel, actions, players } = popup.payload;
-	const { sendMessage } = useWebSocket();
+	const { actionType, actionLabel, actions, players, onSubmit } = popup.payload;
 	const { t } = useTranslation();
 	const selectableActions = useMemo(() => actions ?? [{ actionType, label: actionLabel }], [actionLabel, actionType, actions]);
 	const [selectedActionType, setSelectedActionType] = useState<Exclude<PlayerActionName, "skip">>(selectableActions[0].actionType);
@@ -21,11 +19,7 @@ const PlayerSelectionPopup = ({ popup, onClose }: Props) => {
 
 	const handlePlayerClick = (playerId: number) => {
 		if (PlayerActionType.includes(selectedAction.actionType)) {
-			sendMessage({
-				type: "PLAYER_ACTION",
-				action: selectedAction.actionType,
-				targetPlayerId: playerId
-			});
+			onSubmit(selectedAction.actionType, playerId);
 		} else {
 			console.warn(t("pages.game.actions.invalidActionType", { action: selectedAction.actionType }));
 		}
