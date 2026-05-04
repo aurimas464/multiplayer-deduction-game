@@ -10,6 +10,7 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 	private readonly botDiscussionMinimumDelayMs = 1_000;
 	private readonly botDiscussionMaximumDelayMs = 10_000;
 	private readonly botDiscussionTalkChance = 0.5;
+	private readonly botVotingDiscussionTalkChance = 0.2;
 
 	public constructor(
 		onGameCancelled: (gameId: number) => Promise<void>,
@@ -560,8 +561,8 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 			return;
 		}
 
-		// New bot discussion requests are only queued during the discussion phase
-		if (session.currentPhase !== "day") {
+		// Bot discussion is regular during day and occasional during voting.
+		if (session.currentPhase !== "day" && session.currentPhase !== "voting") {
 			return;
 		}
 
@@ -587,13 +588,14 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 	// Runs one bot discussion tick and schedules the next one
 	private async runBotDiscussionTick(gameId: number, session: InGameSession): Promise<void> {
 		if (session.status !== "in_progress") return;
-		if (session.currentPhase !== "day") return;
+		if (session.currentPhase !== "day" && session.currentPhase !== "voting") return;
 
 		try {
 			const discussionDeadlineAt = this.getBotDiscussionDeadlineAt(session);
 			const requestPhase = session.currentPhase;
 			const requestDayNumber = session.dayNumber;
 			const botPlayerIds = this.getActiveBotPlayerIds(session);
+			const talkChance = requestPhase === "voting" ? this.botVotingDiscussionTalkChance : this.botDiscussionTalkChance;
 
 			// Shuffle bot order so the same bot does not always get first chance to talk
 			for (let i = botPlayerIds.length - 1; i > 0; i--) {
@@ -604,7 +606,7 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 
 			for (const playerId of botPlayerIds) {
 				// Each bot randomly decides whether to talk during this discussion tick
-				if (Math.random() > this.botDiscussionTalkChance) continue;
+				if (Math.random() > talkChance) continue;
 
 				const remainingMs = discussionDeadlineAt - Date.now();
 				if (remainingMs < this.botDiscussionMinimumRemainingMs) return;
@@ -618,6 +620,7 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 
 				// Ignore message if night already started while bot was thinking
 				if (!currentSession || Date.now() >= discussionDeadlineAt || currentPhase === "night") return;
+				if (currentPhase !== "day" && currentPhase !== "voting") return;
 
 				message.phase = currentPhase === "voting" ? "voting" : requestPhase;
 				message.dayNumber = currentSession.dayNumber === requestDayNumber ? requestDayNumber : currentSession.dayNumber;

@@ -360,30 +360,33 @@ class GamePhaseService {
 
 		const livingVampires: number[] = [];
 		const livingNonVampires: number[] = [];
-		const livingCommune: number[] = [];
+		const allVampires: number[] = [];
+		const allCommune: number[] = [];
 
 		for (const [playerId, state] of playerStates) {
-			if (state.runtime.isEliminated) continue;
-
 			const role = playerRoles.get(playerId);
+
+			if (role?.alignment === "vampire") {
+				allVampires.push(playerId);
+			} else if (role?.alignment === "commune") {
+				allCommune.push(playerId);
+			}
+
+			if (state.runtime.isEliminated) continue;
 
 			if (role?.alignment === "vampire") {
 				livingVampires.push(playerId);
 			} else {
 				livingNonVampires.push(playerId);
 			}
-
-			if (role?.alignment === "commune") {
-				livingCommune.push(playerId);
-			}
 		}
 
 		if (livingVampires.length === 0) {
-			return { faction: "commune", playerIds: livingCommune };
+			return { faction: "commune", playerIds: allCommune };
 		}
 
 		if (livingVampires.length >= livingNonVampires.length) {
-			return { faction: "vampire", playerIds: livingVampires };
+			return { faction: "vampire", playerIds: allVampires };
 		}
 
 		return null;

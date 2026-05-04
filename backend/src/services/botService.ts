@@ -1129,33 +1129,33 @@ class BotService {
 	private getDiscussionFallbackCandidates(phase: PhaseType, dayNumber: number): string[] {
 		if (dayNumber === 1 && phase === "day") {
 			return [
-				"Evening. Too early for names from me.",
-				"I'm here, but there is nothing solid yet.",
-				"First day, I'm keeping it simple for now.",
+				"I'll hold names until something real shows up.",
+				"Hello everyone, how are you all this fine day?",
+				"First daylight, Let's just get a read on the table.",
 				"No case from me yet. Let's wait for real evidence.",
-				"Checking in. I don't have a reason to push anyone.",
-				"Nothing useful from me yet, just watching the table."
+				"Good luck tonight everyone, may the odds be ever in your favour.",
+				"Let's see what happens."
 			];
 		}
 
 		if (phase === "voting") {
 			return [
-				"No solid vote from me right now.",
-				"I would rather skip than force a weak vote.",
-				"I don't see enough evidence for a vote yet.",
-				"Skipping feels cleaner until there is a real contradiction.",
-				"I need a stronger case before voting.",
-				"No vote from me unless someone has actual proof."
+				"I'm not sold enough to push a vote.",
+				"I'd rather skip than make a random guess.",
+				"Case is too thin for my vote.",
+				"I need a contradiction, not just a hunch.",
+				"I don't have a clean vote here.",
+				"Unless someone has proof, I'm leaning skip."
 			];
 		}
 
 		return [
-			"I don't have a clean case yet.",
-			"Any real results or claim details worth comparing?",
-			"Let's keep claims tied to actual results.",
-			"I want evidence before naming someone.",
-			"Nothing firm from my side right now.",
-			"If someone has a result, now would be a good time to say it."
+            "I want evidence before naming someone.",
+			"Any result claims we can actually compare?",
+			"Let's keep this tied to results, not noise.",
+			"I want a real link before I point.",
+			"Nothing firm enough from my side yet.",
+			"If someone has something, now would be a good time to say it."
 		];
 	}
 
