@@ -5,7 +5,7 @@ import type { RegisterData } from "../types/auth";
 import { useTranslation } from "../hooks/useTranslation";
 import { useLanguage } from "../contexts/LanguageContext";
 import { errorMapper } from "../utils/errorMapper";
-import { ErrorCode } from "../types";
+import { ErrorCode, type ErrorCodeType } from "../types";
 import "../css/auth.css";
 import { useUser } from "../contexts/UserContext";
 
@@ -20,6 +20,7 @@ const Register = () => {
 	});
 
 	const [errors, setErrors] = useState<FieldErrors>({});
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const navigate = useNavigate();
 	const { language } = useLanguage();
@@ -43,7 +44,8 @@ const Register = () => {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setErrors({});
+
+		if (isSubmitting) return;
 
 		if (formData.password !== formData.confirmPassword) {
 			setErrors({
@@ -52,9 +54,14 @@ const Register = () => {
 			return;
 		}
 
+		setIsSubmitting(true);
+
 		const response = await authService.register(formData);
 
+		setIsSubmitting(false);
+
 		if (response?.success) {
+			setErrors({});
 			navigate("/login", { state: { fromRegister: true } });
 			return;
 		}
@@ -64,7 +71,7 @@ const Register = () => {
 
 		for (const err of apiErrors) {
 			const field = err.field as keyof RegisterData | undefined;
-			const code = err.code as ErrorCode;
+			const code = err.code as ErrorCodeType;
 
 			if (field) {
 				nextErrors[field] = errorMapper(code, t, language, getFieldLabel(field));
@@ -146,7 +153,7 @@ const Register = () => {
 						/>
 					</div>
 
-					<button type="submit" className="submit-button">
+					<button type="submit" className="submit-button" disabled={isSubmitting}>
 						{t("pages.register.submit", {}, language)}
 					</button>
 

@@ -4,14 +4,6 @@ import config from "../config";
 import { AppError, ErrorCode } from "../types";
 import type { JwtPayload } from "../types/config";
 
-declare global {
-	namespace Express {
-		interface Request {
-			user?: JwtPayload;
-		}
-	}
-}
-
 export const authenticateToken = (req: Request, _res: Response, next: NextFunction): void => {
 	const authHeader = req.headers.authorization;
 

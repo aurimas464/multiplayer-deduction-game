@@ -1,18 +1,14 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "../css/tooltip.css";
 
 export type TooltipPosition = "left" | "right" | "top" | "bottom" | "auto";
 
-type TooltipTriggerProps = {
-	onMouseEnter?: (e: React.MouseEvent) => void;
-	onMouseLeave?: (e: React.MouseEvent) => void;
-	[key: string]: any;
-};
-
 export type TooltipProps = {
 	content: React.ReactNode;
-	children: React.ReactElement<TooltipTriggerProps>;
+	children: React.ReactNode;
+	forceVisible?: boolean;
+	hoverEnabled?: boolean;
 	position?: TooltipPosition;
 	showDelay?: number;
 	hideDelay?: number;
@@ -24,9 +20,11 @@ export type TooltipProps = {
 	padding?: number;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip = ({
 	content,
 	children,
+	forceVisible,
+	hoverEnabled = true,
 	position = "right",
 	showDelay = 500,
 	hideDelay = 1000,
@@ -36,9 +34,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
 	containerClassName = "tooltip-container",
 	offset = 8,
 	padding = 8
-}) => {
+}: TooltipProps) => {
 	const [isVisible, setIsVisible] = useState(false);
 	const [shouldRender, setShouldRender] = useState(false);
+	const [isPositionReady, setIsPositionReady] = useState(false);
 
 	const [calculatedPosition, setCalculatedPosition] = useState<Exclude<TooltipPosition, "auto">>("right");
 	const [coords, setCoords] = useState<{ left: number; top: number }>({
@@ -62,7 +61,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 	// To make sure it doesn"t go off screen
 	const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
-	const computeBestPosition = (): Exclude<TooltipPosition, "auto"> => {
+	const computeBestPosition = useCallback((): Exclude<TooltipPosition, "auto"> => {
 		if (!containerRef.current || !tooltipRef.current) return "right";
 
 		const trigger = containerRef.current.getBoundingClientRect();
@@ -110,9 +109,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
 		}
 
 		return best;
-	};
+	}, [offset]);
 
-	const computeCoordsForPosition = (pos: Exclude<TooltipPosition, "auto">) => {
+	const computeCoordsForPosition = useCallback((pos: Exclude<TooltipPosition, "auto">) => {
 		if (!containerRef.current || !tooltipRef.current) return;
 
 		const trigger = containerRef.current.getBoundingClientRect();
@@ -150,7 +149,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 		top = clamp(top, padding, vh - tip.height - padding);
 
 		setCoords({ left, top });
-	};
+	}, [offset, padding]);
 
 	const finalPosition: Exclude<TooltipPosition, "auto"> = position === "auto" ? calculatedPosition : position;
 
@@ -167,6 +166,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
 		// Schedule a reflow to compute coords after render
 		const raf = requestAnimationFrame(() => {
+			setIsPositionReady(false);
+
 			if (position === "auto") {
 				const best = computeBestPosition();
 				setCalculatedPosition(best);
@@ -174,12 +175,42 @@ export const Tooltip: React.FC<TooltipProps> = ({
 			} else {
 				computeCoordsForPosition(position);
 			}
+
+			setIsPositionReady(true);
 		});
 
 		return () => cancelAnimationFrame(raf);
-	}, [shouldRender, content, width, height, offset, position]);
+	}, [shouldRender, content, width, height, position, computeBestPosition, computeCoordsForPosition]);
 
-	const handleShow = () => {
+	useEffect(() => {
+		if (forceVisible === undefined) return;
+
+		clearTimer(showTimeoutRef);
+		clearTimer(hideTimeoutRef);
+		clearTimer(hideDelayRef);
+
+		if (forceVisible) {
+			const timer = window.setTimeout(() => {
+				setShouldRender(true);
+				setIsVisible(true);
+			}, 0);
+
+			return () => window.clearTimeout(timer);
+		}
+
+		const timer = window.setTimeout(() => {
+			setIsVisible(false);
+
+			hideTimeoutRef.current = setTimeout(() => {
+				setShouldRender(false);
+				hideTimeoutRef.current = null;
+			}, 500);
+		}, 0);
+
+		return () => window.clearTimeout(timer);
+	}, [forceVisible]);
+
+	const handleShow = useCallback(() => {
 		clearTimer(hideTimeoutRef);
 		clearTimer(hideDelayRef);
 
@@ -190,9 +221,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
 			setIsVisible(true);
 			showTimeoutRef.current = null;
 		}, showDelay);
-	};
+	}, [showDelay]);
 
-	const handleHide = () => {
+	const handleHide = useCallback(() => {
 		clearTimer(showTimeoutRef);
 
 		clearTimer(hideDelayRef);
@@ -207,31 +238,65 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
 			hideDelayRef.current = null;
 		}, hideDelay);
+	}, [hideDelay]);
+
+	useEffect(() => {
+		if (!shouldRender || forceVisible !== undefined || hoverEnabled) return;
+
+		const handleDocumentMouseDown = (event: MouseEvent) => {
+			const target = event.target as Node;
+
+			if (containerRef.current?.contains(target)) return;
+			if (tooltipRef.current?.contains(target)) return;
+
+			handleHide();
+		};
+
+		document.addEventListener("mousedown", handleDocumentMouseDown);
+
+		return () => {
+			document.removeEventListener("mousedown", handleDocumentMouseDown);
+		};
+	}, [forceVisible, handleHide, hoverEnabled, shouldRender]);
+
+
+	const hasContainerClass = containerClassName.trim().length > 0;
+	const handleTriggerClick = () => {
+		if (hoverEnabled || forceVisible !== undefined) return;
+
+		if (shouldRender && isVisible) {
+			handleHide();
+		} else {
+			handleShow();
+		}
+	};
+	const handleMouseEnter = () => {
+		if (hoverEnabled) {
+			handleShow();
+		}
+	};
+	const handleMouseLeave = () => {
+		if (hoverEnabled) {
+			handleHide();
+		}
 	};
 
-
-	const triggerProps = children.props as TooltipTriggerProps;
-
-	const child = React.cloneElement(children, {
-		onMouseEnter: (e: React.MouseEvent) => {
-			handleShow();
-			triggerProps.onMouseEnter?.(e);
-		},
-		onMouseLeave: (e: React.MouseEvent) => {
-			handleHide();
-			triggerProps.onMouseLeave?.(e);
-		}
-	});
-
 	return (
-		<div className={containerClassName} ref={containerRef}>
-			{child}
+		<div
+			className={containerClassName}
+			ref={containerRef}
+			style={hasContainerClass ? undefined : { display: "contents" }}
+			onClick={handleTriggerClick}
+			onMouseEnter={handleMouseEnter}
+			onMouseLeave={handleMouseLeave}
+		>
+			{children}
 
 			{shouldRender &&
 				createPortal(
 					<div
 						ref={tooltipRef}
-						className={`tooltip tooltip-${finalPosition} ${className} ${isVisible ? "visible" : ""}`}
+						className={`tooltip tooltip-${finalPosition} ${className} ${isVisible && isPositionReady ? "visible" : ""}`}
 						style={{
 							width,
 							height,
@@ -239,8 +304,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
 							left: `${coords.left}px`,
 							top: `${coords.top}px`
 						}}
-						onMouseEnter={handleShow}
-						onMouseLeave={handleHide}
+						onMouseEnter={hoverEnabled ? handleShow : undefined}
+						onMouseLeave={hoverEnabled ? handleHide : undefined}
+						onClick={(e) => e.stopPropagation()}
 						role="tooltip"
 					>
 						{content}

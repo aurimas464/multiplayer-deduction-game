@@ -4,13 +4,18 @@ import { translations } from "../locales";
 import { useLanguage } from "../contexts/LanguageContext";
 
 // Resolve nested translation from  translations object
-const getNestedValue = (language_obj: any, path: string) => {
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+	return typeof value === "object" && value !== null;
+};
+
+const getNestedValue = (languageObj: unknown, path: string) => {
 	const keys = path.split(".");
-	let value = language_obj;
+	let value = languageObj;
 
 	for (const k of keys) {
-		value = value?.[k];
-		if (value === undefined) return undefined;
+		if (!isRecord(value)) return undefined;
+
+		value = value[k];
 	}
 
 	return value;

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { type Theme, type ColorTheme, type Language, themes, colorThemes, languages, type User, type UserSettings } from "../../types/settings";
@@ -17,6 +18,22 @@ const ALLOWED_MIME_TYPES = [
 	"image/webp",
 ] as const;
 
+const makeSettingsFromUser = (user: User | null): UserSettings => ({
+	theme: user?.theme ?? themes[0],
+	colorTheme: user?.colorTheme ?? colorThemes[0],
+	language: user?.language ?? languages[0],
+	icon: user?.player.icon ?? "",
+});
+
+const areSettingsEqual = (left: UserSettings, right: UserSettings) => {
+	return (
+		left.theme === right.theme &&
+		left.colorTheme === right.colorTheme &&
+		left.language === right.language &&
+		left.icon === right.icon
+	);
+};
+
 const Settings = () => {
 	const { t } = useTranslation();
 	const { user, setUser } = useUser();
@@ -24,112 +41,100 @@ const Settings = () => {
 	const { setLanguage, language } = useLanguage();
 	const { showPopup, closePopup } = usePopup();
 
-	const makeSettingsFromUser = (u: User | null): UserSettings => ({
-		theme: u?.theme ?? themes[0],
-		colorTheme: u?.colorTheme ?? colorThemes[0],
-		language: u?.language ?? languages[0],
-		icon: u?.player.icon ?? "",
-	});
-
-	const [currentSettings, setCurrentSettings] = useState<UserSettings>(() =>
+	const [draftSettings, setDraftSettings] = useState<UserSettings>(() =>
 		makeSettingsFromUser(user ?? null)
 	);
-
-	const originalSettingsRef = useRef<UserSettings>(
+	const [savedSettings, setSavedSettings] = useState<UserSettings>(() =>
 		makeSettingsFromUser(user ?? null)
 	);
-
-	const [iconPreviewUrl, setIconPreviewUrl] = useState<string>(() => (user?.player.icon ?? ""));
+	const savedSettingsRef = useRef<UserSettings>(savedSettings);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-	const resolvedPreviewUrl = useMemo(() => {
-		return iconPreviewUrl && iconPreviewUrl.trim().length > 0 ? iconPreviewUrl : defaultIcon;
-	}, [iconPreviewUrl]);
-
-	const isChanged = (next: UserSettings) => {
-		const orig = originalSettingsRef.current;
-		return (
-			next.theme !== orig.theme ||
-			next.colorTheme !== orig.colorTheme ||
-			next.language !== orig.language ||
-			next.icon !== orig.icon
-		);
-	};
-
-	const hasUnsavedChanges = isChanged(currentSettings);
+	const resolvedPreviewUrl = draftSettings.icon.trim().length > 0 ? draftSettings.icon : defaultIcon;
+	const hasUnsavedChanges = !areSettingsEqual(draftSettings, savedSettings);
 	const hasUnsavedRef = useRef(hasUnsavedChanges);
 
-	useEffect(() => {
-		hasUnsavedRef.current = hasUnsavedChanges;
-	}, [hasUnsavedChanges]);
+	// Update draft settings and track unsaved changes
+	const updateDraftSettings = useCallback((next: UserSettings) => {
+		hasUnsavedRef.current = !areSettingsEqual(next, savedSettingsRef.current);
+		setDraftSettings(next);
+	}, []);
 
-	const applyPreview = (next: UserSettings) => {
+	// Apply settings preview to contexts (theme, color, language)
+	const applyPreview = useCallback((next: UserSettings) => {
 		setTheme(next.theme);
 		setColorTheme(next.colorTheme);
 		setLanguage(next.language);
-	};
+	}, [setColorTheme, setLanguage, setTheme]);
 
-	const resetFileInput = () => {
+	// Apply preview whenever draft settings change
+	useEffect(() => {
+		applyPreview(draftSettings);
+	}, [applyPreview, draftSettings]);
+
+	// Reset file input value
+	const resetFileInput = useCallback(() => {
 		if (!fileInputRef.current) return;
 		fileInputRef.current.value = "";
-	};
+	}, []);
 
-	const revertContextToOriginal = () => {
-		const orig = originalSettingsRef.current;
-		setTheme(orig.theme);
-		setColorTheme(orig.colorTheme);
-		setLanguage(orig.language);
-		setIconPreviewUrl(orig.icon || "");
+	// Revert contexts to last saved settings
+	const revertContextToSaved = useCallback(() => {
+		const saved = savedSettingsRef.current;
+		setTheme(saved.theme);
+		setColorTheme(saved.colorTheme);
+		setLanguage(saved.language);
 		resetFileInput();
-	};
+	}, [resetFileInput, setColorTheme, setLanguage, setTheme]);
 
+	// Sync settings when user data changes (but preserve unsaved changes)
 	useEffect(() => {
-		if (!user) return;
 		if (hasUnsavedRef.current) return;
 
-		const next = makeSettingsFromUser(user);
-		setCurrentSettings(next);
-		originalSettingsRef.current = next;
-
-		setIconPreviewUrl(next.icon || "");
+		const next = makeSettingsFromUser(user ?? null);
+		hasUnsavedRef.current = false;
+		savedSettingsRef.current = next;
+		setDraftSettings(next);
+		setSavedSettings(next);
 		resetFileInput();
-	}, [user]);
+	}, [resetFileInput, user]);
 
+	// Cleanup: revert contexts if there are unsaved changes on unmount
 	useEffect(() => {
 		return () => {
 			if (!hasUnsavedRef.current) return;
-			revertContextToOriginal();
+			revertContextToSaved();
 		};
-	}, []);
+	}, [revertContextToSaved]);
 
-	const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+	// Input change handlers for different setting types
+	const handleLanguageChange = (e: ChangeEvent<HTMLSelectElement>) => {
 		const newLanguage = e.target.value as Language;
-		const next: UserSettings = { ...currentSettings, language: newLanguage };
+		const next: UserSettings = { ...draftSettings, language: newLanguage };
 
-		setCurrentSettings(next);
-		applyPreview(next);
+		updateDraftSettings(next);
 	};
 
-	const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+	const handleThemeChange = (e: ChangeEvent<HTMLSelectElement>) => {
 		const newTheme = e.target.value as Theme;
-		const next: UserSettings = { ...currentSettings, theme: newTheme };
+		const next: UserSettings = { ...draftSettings, theme: newTheme };
 
-		setCurrentSettings(next);
-		applyPreview(next);
+		updateDraftSettings(next);
 	};
 
-	const handleColorThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+	const handleColorThemeChange = (e: ChangeEvent<HTMLSelectElement>) => {
 		const newColorTheme = e.target.value as ColorTheme;
-		const next: UserSettings = { ...currentSettings, colorTheme: newColorTheme };
+		const next: UserSettings = { ...draftSettings, colorTheme: newColorTheme };
 
-		setCurrentSettings(next);
-		applyPreview(next);
+		updateDraftSettings(next);
 	};
 
+	// Icon picker handlers
 	const handlePickIconClick = () => {
 		fileInputRef.current?.click();
 	};
 
+	// Convert file to data URL for preview
 	const fileToDataUrl = (file: File) => {
 		return new Promise<string>((resolve, reject) => {
 			const reader = new FileReader();
@@ -139,14 +144,17 @@ const Settings = () => {
 		});
 	};
 
-	const handleIconChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+	// Handle icon file upload with validation
+	const handleIconChange = async (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0] ?? null;
 		if (!file) return;
 
+		// Validate file type
 		if (!ALLOWED_MIME_TYPES.includes(file.type as (typeof ALLOWED_MIME_TYPES)[number])) {
 			showPopup({
 				type: "error",
 				title: t("common.error"),
+				position: "center",
 				payload: { message: t("components.sidebar.settings.iconUpload.invalidType") },
 				autoCloseDelay: 5000,
 			});
@@ -157,12 +165,17 @@ const Settings = () => {
 		try {
 			const dataUrl = await fileToDataUrl(file);
 
-			setIconPreviewUrl(dataUrl);
-			setCurrentSettings({ ...currentSettings, icon: dataUrl });
+			// Update draft settings with new icon
+			setDraftSettings((prev) => {
+				const next = { ...prev, icon: dataUrl };
+				hasUnsavedRef.current = !areSettingsEqual(next, savedSettingsRef.current);
+				return next;
+			});
 		} catch {
 			showPopup({
 				type: "error",
 				title: t("common.error"),
+				position: "center",
 				payload: { message: t("components.sidebar.settings.iconUpload.readFailed") },
 				autoCloseDelay: 5000,
 			});
@@ -171,54 +184,73 @@ const Settings = () => {
 		}
 	};
 
+	// Save settings to server with loading state and error handling
 	const handleSaveClick = async () => {
-		const settingsToSave: UserSettings = { ...currentSettings };
+		if (!hasUnsavedChanges) return;
 
+		const settingsToSave: UserSettings = { ...draftSettings };
+
+		// Show loading popup
 		const loadingId = showPopup({
 			type: "loading",
 			title: t("common.loading"),
 			payload: {},
 		});
-		const response = await userService.saveSettings(settingsToSave);
-		setTimeout(() => {
-			closePopup(loadingId);
-		}, 500);
 
-		if (response.success) {
-			originalSettingsRef.current = settingsToSave;
-			setCurrentSettings(settingsToSave);
+		try {
+			const response = await userService.saveSettings(settingsToSave);
 
-			if (user) {
-				setUser({
-					...user,
-					colorTheme: settingsToSave.colorTheme,
-					theme: settingsToSave.theme,
-					language: settingsToSave.language,
-					player: {
-						...user.player,
-						icon: settingsToSave.icon,
-					},
+			if (response.success) {
+				// Update all state refs and state variables on success
+				hasUnsavedRef.current = false;
+				savedSettingsRef.current = settingsToSave;
+				setSavedSettings(settingsToSave);
+				setDraftSettings(settingsToSave);
+
+				// Update user context with new settings
+				if (user) {
+					setUser({
+						...user,
+						colorTheme: settingsToSave.colorTheme,
+						theme: settingsToSave.theme,
+						language: settingsToSave.language,
+						player: {
+							...user.player,
+							icon: settingsToSave.icon,
+						},
+					});
+				}
+
+				// Show success popup
+				showPopup({
+					type: "success",
+					title: t("common.success"),
+					position: "center",
+					payload: { message: t("components.sidebar.settings.saveSuccessMessage") },
+					autoCloseDelay: 5000,
 				});
+
+				return;
 			}
 
-			showPopup({
-				type: "success",
-				title: t("common.success"),
-				payload: { message: t("components.sidebar.settings.saveSuccessMessage") },
-				autoCloseDelay: 5000,
-			});
-		} else {
-			setCurrentSettings(originalSettingsRef.current);
-			revertContextToOriginal();
+			// Handle server error response
+			hasUnsavedRef.current = false;
+			setDraftSettings(savedSettingsRef.current);
+			revertContextToSaved();
 
 			const code = response.errors?.[0]?.code;
 			const errorMessage = errorMapper(code, t, language);
 			showPopup({
 				type: "error",
 				title: t("common.error"),
+				position: "center",
 				payload: { message: errorMessage },
 				autoCloseDelay: 5000,
 			});
+			
+		} finally {
+			// Always close loading popup
+			closePopup(loadingId);
 		}
 	};
 
@@ -232,7 +264,9 @@ const Settings = () => {
 					<div className="form-group">
 						<select
 							className="custom-dropdown"
-							value={currentSettings.language}
+							id="settings-language"
+							name="language"
+							value={draftSettings.language}
 							onChange={handleLanguageChange}
 						>
 							<option value="en">
@@ -250,15 +284,21 @@ const Settings = () => {
 					<div className="form-group">
 						<select
 							className="custom-dropdown"
-							value={currentSettings.theme}
+							id="settings-theme"
+							name="theme"
+							value={draftSettings.theme}
 							onChange={handleThemeChange}
 						>
-							<option value="light">
-								{t("components.sidebar.settings.themeSelect.light")}
-							</option>
 							<option value="dark">
 								{t("components.sidebar.settings.themeSelect.dark")}
 							</option>
+							<option value="light">
+								{t("components.sidebar.settings.themeSelect.light")}
+							</option>
+							<option value="dynamic">
+								{t("components.sidebar.settings.themeSelect.dynamic")}
+							</option>
+
 						</select>
 					</div>
 				</div>
@@ -268,7 +308,9 @@ const Settings = () => {
 					<div className="form-group">
 						<select
 							className="custom-dropdown"
-							value={currentSettings.colorTheme}
+							id="settings-color-theme"
+							name="colorTheme"
+							value={draftSettings.colorTheme}
 							onChange={handleColorThemeChange}
 						>
 							<option value="red">
@@ -305,6 +347,7 @@ const Settings = () => {
 								<img
 									className="player-icon"
 									src={resolvedPreviewUrl}
+									alt=""
 								/>
 							</div>
 						</Tooltip>
@@ -312,6 +355,8 @@ const Settings = () => {
 						<input
 							ref={fileInputRef}
 							type="file"
+							id="settings-icon"
+							name="icon"
 							accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
 							onChange={handleIconChange}
 							className="icon-picker-input"
@@ -322,7 +367,7 @@ const Settings = () => {
 			</div>
 
 			<div className="sidebar-footer">
-				<button className="custom-button" onClick={handleSaveClick}>
+				<button className="custom-button" onClick={handleSaveClick} disabled={!hasUnsavedChanges}>
 					{t("common.save")}
 				</button>
 			</div>

@@ -1,4 +1,5 @@
-import prisma from "./client";
+import { RoleModel } from "../src/repositories/roleRepository";
+import { BotModel } from "../src/repositories/botRepository";
 import { roleAlignment } from "../src/types/entities/role";
 
 const ROLES = [
@@ -19,62 +20,21 @@ const ROLES = [
 	{ key: "chronicler", alignment: roleAlignment[2], weight: 2 }
 ];
 
+// Names
 const BOT_NAMES = ["Alaric","Lucien","Vesper","Valerius","Ravenna","Draven","Isolde","Morwen","Corvin","Selene","Thorne","Lilith","Varian","Nyx","Adrian","Belladonna","Dorian","Malachai","Seraphine","Noctis"] as const;
 
 async function seedRoles(): Promise<void> {
 	for (const role of ROLES) {
-		await prisma.role.upsert({
-			where: { key: role.key },
-			update: {
-				alignment: role.alignment,
-				weight: role.weight
-			},
-			create: role
-		});
+		await RoleModel.upsert(role);
 	}
 }
 
 async function seedBots(): Promise<void> {
 	for (const name of BOT_NAMES) {
-		const existingBot = await prisma.bot.findUnique({
-			where: { name },
-			select: { id: true }
-		});
-
-		if (existingBot) {
-			const existingBotPlayer = await prisma.botPlayer.findUnique({
-				where: { botId: existingBot.id },
-				select: { botId: true }
-			});
-			if (!existingBotPlayer) {
-				await prisma.player.create({
-					data: {
-						type: "bot",
-						bot: {
-							create: {
-								botId: existingBot.id
-							}
-						}
-					}
-				});
-			}
-			continue;
+		const existingBot = await BotModel.findByName(name);
+		if (!existingBot) {
+			await BotModel.create({ name });
 		}
-
-		const createdBot = await prisma.bot.create({
-			data: { name }
-		});
-
-		await prisma.player.create({
-			data: {
-				type: "bot",
-				bot: {
-					create: {
-						botId: createdBot.id
-					}
-				}
-			}
-		});
 	}
 }
 

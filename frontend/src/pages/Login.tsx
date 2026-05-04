@@ -30,15 +30,22 @@ const Login = () => {
 
 	const [errorMessage, setError] = useState<string>("");
 	const [successMessage, setSuccessMessage] = useState<string>("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setError("");
+
+		if (isSubmitting) return;
+
+		setIsSubmitting(true);
 		setSuccessMessage("");
 
 		const response = await authService.login(formData);
 
+		setIsSubmitting(false);
+
 		if (response.success) {
+			setError("");
 
 			if (response.result?.user) {
 				setUser(response.result.user);
@@ -49,15 +56,22 @@ const Login = () => {
 		}
 
 		const code = response.errors?.[0]?.code;
-		setError(errorMapper(code, t, language));
+		const newErrorMessage = errorMapper(code, t, language);
+
+		setError(prevErrorMessage => (prevErrorMessage === newErrorMessage ? prevErrorMessage : newErrorMessage));
 	};
 
 	useEffect(() => {
 		const state = location.state as { fromRegister?: boolean } | null;
-		if (state?.fromRegister) {
+
+		if (!state?.fromRegister) return;
+
+		const timer = window.setTimeout(() => {
 			setSuccessMessage(t("pages.login.registrationSuccess", {}, language));
-		}
-	}, [location, t]);
+		}, 0);
+
+		return () => window.clearTimeout(timer);
+	}, [location, t, language]);
 
 	if (user) return <Navigate to="/home" replace />;
 
@@ -94,7 +108,7 @@ const Login = () => {
 							placeholder={t("pages.login.fields.password", {}, language)}
 						/>
 					</div>
-					<button type="submit" className="submit-button">
+					<button type="submit" className="submit-button" disabled={isSubmitting}>
 						{t("pages.login.submit", {}, language)}
 					</button>
 

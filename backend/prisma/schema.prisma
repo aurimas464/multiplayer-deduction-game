@@ -4,12 +4,12 @@ generator client {
 
 datasource db {
 	provider = "mysql"
-	url      = env("DATABASE_URL")
 }
 
 enum Theme {
 	dark
 	light
+	dynamic
 }
 
 enum ColorTheme {
@@ -31,6 +31,7 @@ enum PlayerType {
 
 enum GameStatus {
 	lobby
+	starting
 	in_progress
 	finished
 	cancelled
@@ -39,13 +40,11 @@ enum GameStatus {
 enum TieBehavior {
 	no_one_dies
 	random_among_tied
-	revote
 }
 
 enum VoteCountVisibility {
 	never
 	end
-	live
 }
 
 enum RoleAlignment {
@@ -65,147 +64,358 @@ enum RoleDistributionMode {
 	weighted_random
 }
 
-model UserPlayer {
-	playerId Int @id
-	userId   Int @unique
+enum FriendshipStatus {
+	pending
+	accepted
+	blocked
+	removed
+}
 
-	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
-	user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+enum GameChatMessageType {
+	player
+	system
+	bot
+}
+
+enum BotDifficulty {
+	random
+	easy
+	normal
+	hard
+}
+
+enum BotPlaystyle {
+	random
+	balanced
+	aggressive
+	passive
+	deceptive
+	defensive
+	chaotic
+}
+
+model UserPlayer {
+	playerId              Int                  @id
+	userId                Int                  @unique
+
+	player                Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model BotPlayer {
-	playerId Int @id
-	botId    Int @unique
+	playerId              Int                  @id
+	botId                 Int                  @unique
 
-	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
-	bot    Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+	player                Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	bot                   Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model User {
-	id       Int    @id @default(autoincrement())
-	username String @unique
-	email    String @unique
-	password String
+	id                    Int                  @id @default(autoincrement())
 
-	theme      Theme      @default(dark)
-	colorTheme ColorTheme @default(red)
-	language   Language   @default(en)
+	username              String               @unique
+	email                 String               @unique
+	password              String
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	theme                 Theme                @default(dark)
+	colorTheme            ColorTheme           @default(red)
+	language              Language             @default(en)
 
-	session    Session?
-	userPlayer UserPlayer?
-}
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
 
-model Session {
-	id               Int      @id @default(autoincrement())
-	userId           Int      @unique
-	refreshTokenHash String
-	refreshExpiresAt DateTime
+	sessions              Session[]
+	userPlayer            UserPlayer?
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	friendshipsAsUser1    Friendship[]         @relation("friendshipsAsUser1")
+	friendshipsAsUser2    Friendship[]         @relation("friendshipsAsUser2")
+	friendRequestsSent    Friendship[]         @relation("friendRequestsSent")
+	friendRequestsBlocked Friendship[]         @relation("friendRequestsBlocked")
+	directChatMessages    DirectChatMessage[]
+	notes                 Note[]
 
-	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+	@@index([createdAt])
 }
 
 model Bot {
-	id   Int    @id @default(autoincrement())
-	name String @unique
+	id                    Int                  @id @default(autoincrement())
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	name                  String               @unique
 
-	botPlayer BotPlayer?
+	botPlayer             BotPlayer?
 }
 
 model Player {
-	id       Int        @id @default(autoincrement())
-	type     PlayerType
+	id                    Int                  @id @default(autoincrement())
 
-	icon     String?    @db.MediumText
-	iconEtag String?
+	type                  PlayerType
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	icon                  String?              @db.MediumText
+	iconEtag              String?
 
-	user UserPlayer?
-	bot  BotPlayer?
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
 
-	participants Participant[]
+	user                  UserPlayer?
+	bot                   BotPlayer?
+
+	participants          Participant[]
+	gameBotSetups         GameBotSetup[]
+	gameChatMessages      GameChatMessage[]
+}
+
+model Session {
+	id                    Int                  @id @default(autoincrement())
+	userId                Int
+
+	refreshTokenHash      String               @unique
+	refreshExpiresAt      DateTime
+
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@index([userId])
+	@@index([refreshExpiresAt])
 }
 
 model Game {
-	id       Int        @id @default(autoincrement())
-	gameCode String     @unique
-	status   GameStatus @default(lobby)
+	id                    Int                  @id @default(autoincrement())
 
-	maxPlayers Int @db.SmallInt @default(10)
-	minPlayers Int @db.SmallInt @default(5)
+	gameCode              String               @unique	
+	status                GameStatus           @default(lobby)
 
-	phaseType     PhaseType?
-	daySeconds    Int @db.SmallInt @default(60)
-	votingSeconds Int @db.SmallInt @default(30)
-	nightSeconds  Int @db.SmallInt @default(60)
+	phase                 PhaseType?
+	dayNumber             Int                  @default(1)
+	winnerAlignment       RoleAlignment?
 
-	tieBehavior          TieBehavior          @default(no_one_dies)
-	voteCountVisibility  VoteCountVisibility  @default(end)
-	anonymousVoting      Boolean              @default(false)
-	roleRevealOnDeath    Boolean              @default(true)
-	roleDistributionMode RoleDistributionMode @default(exact)
+	maxPlayers            Int                  @db.SmallInt @default(10)
+	minPlayers            Int                  @db.SmallInt @default(5)
+	daySeconds            Int                  @db.SmallInt @default(60)
+	votingSeconds         Int                  @db.SmallInt @default(30)
+	nightSeconds          Int                  @db.SmallInt @default(60)
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	tieBehavior           TieBehavior          @default(no_one_dies)
+	voteCountVisibility   VoteCountVisibility  @default(end)
+	roleDistributionMode  RoleDistributionMode @default(exact)
+	anonymousVoting       Boolean              @default(false)
+	roleRevealOnDeath     Boolean              @default(true)
 
-	participants Participant[]
-	roleSetup    GameRoleSetup[]
-}
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
 
-model GameRoleSetup {
-	id Int @id @default(autoincrement())
+	gameRoleSetup         GameRoleSetup[]
+	gameBotSetup          GameBotSetup[]
+	gameChatMessages      GameChatMessage[]
+	participants          Participant[]
+	actions               Action[]
 
-	gameId Int
-	roleId Int
-	count  Int? @db.SmallInt
-
-	game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-	role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
-
-	@@unique([gameId, roleId])
-	@@index([gameId])
-	@@index([roleId])
+	@@index([status, createdAt])
+	@@index([createdAt])
+	@@index([roleDistributionMode])
+	@@index([tieBehavior])
+	@@index([voteCountVisibility])
+	@@index([anonymousVoting])
+	@@index([roleRevealOnDeath])
+	@@index([winnerAlignment])
 }
 
 model Role {
-	id        Int           @id @default(autoincrement())
-	key       String        @unique
-	alignment RoleAlignment
-	weight    Int           @db.SmallInt
+	id                    Int                  @id @default(autoincrement())
 
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
+	key                   String               @unique
 
-	gameSetupEntries GameRoleSetup[]
-	participants     Participant[]
+	alignment             RoleAlignment
+	weight                Int                  @db.SmallInt
+
+	gameRoleSetups        GameRoleSetup[]
+	participants          Participant[]
 }
 
 model Participant {
-	gameId   Int
-	playerId Int
-	seatNr   Int
-	roleId   Int?
+	gameId                Int
+	playerId              Int
+	roleId                Int?
 
-	game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
-	player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
-	role   Role?  @relation(fields: [roleId], references: [id])
+	didWin                Boolean              @default(false)
+	isAlive               Boolean              @default(true)
+	seatNr                Int
 
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	game                  Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	player                Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	role                  Role?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+	actionsAsActor        Action[]             @relation("ActionActor")
+	actionsAsTarget       Action[]             @relation("ActionTarget")
+	
 	@@id([gameId, playerId])
 	@@unique([gameId, seatNr])
-	@@index([playerId])
+	@@index([playerId, roleId])
 	@@index([roleId])
-	@@index([gameId])
+	@@index([gameId, roleId])
+	@@index([gameId, didWin])
+	@@index([gameId, isAlive])
+}
+
+model GameRoleSetup {
+	gameId                Int
+	roleId                Int
+
+	count                 Int                  @db.SmallInt
+
+	game                  Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	role                  Role                 @relation(fields: [roleId], references: [id], onDelete: Cascade)
+	
+	@@index([roleId])
+	@@id([gameId, roleId])
+}
+
+model GameBotSetup {
+	gameId                Int
+	playerId              Int
+
+	difficulty            BotDifficulty        @default(random)
+	playstyle             BotPlaystyle         @default(random)
+	memoryJson            Json?
+
+	game                  Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	bot                   Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	
+	@@index([playerId])
+	@@id([gameId, playerId])
+}
+
+model Action {
+	id                    Int                  @id @default(autoincrement())
+	gameId                Int
+	actorParticipantId    Int
+	targetParticipantId   Int?
+
+	actionKey             String
+
+	dayNumber             Int
+	phase                 PhaseType
+
+	createdAt             DateTime             @default(now())
+
+	game                  Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	actorParticipant      Participant          @relation("ActionActor", fields: [gameId, actorParticipantId], references: [gameId, playerId], onDelete: Cascade)
+	targetParticipant     Participant?         @relation("ActionTarget", fields: [gameId, targetParticipantId], references: [gameId, playerId], onDelete: NoAction)
+
+	@@index([gameId, dayNumber, phase, createdAt])
+	@@index([gameId, actorParticipantId])
+	@@index([gameId, targetParticipantId])
+	@@index([actionKey])
+	@@index([createdAt])
+}
+
+model GameChatMessage {
+	id                    Int                  @id @default(autoincrement())
+	gameId                Int
+	playerId              Int?
+
+	message               String               @db.Text
+	messageType           GameChatMessageType
+
+	dayNumber             Int
+	phase                 PhaseType
+
+	createdAt             DateTime             @default(now())
+
+	game                  Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+	player                Player?              @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+	@@index([gameId, dayNumber, createdAt])
+	@@index([playerId])
+	@@index([createdAt])
+}
+
+model Friendship {
+	id                    Int                  @id @default(autoincrement())
+	userId1               Int
+	userId2               Int
+	requestedBy           Int
+	blockedBy             Int?
+
+	status                FriendshipStatus     @default(pending)
+
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	user1                 User                 @relation("friendshipsAsUser1", fields: [userId1], references: [id], onDelete: Cascade)
+	user2                 User                 @relation("friendshipsAsUser2", fields: [userId2], references: [id], onDelete: Cascade)
+	requester             User                 @relation("friendRequestsSent", fields: [requestedBy], references: [id], onDelete: Cascade)
+	blocker               User?                @relation("friendRequestsBlocked", fields: [blockedBy], references: [id], onDelete: SetNull)
+	directChat            DirectChat?
+
+	@@unique([userId1, userId2])
+	@@index([status, userId1])
+	@@index([status, userId2])
+	@@index([userId1])
+	@@index([userId2])
+	@@index([status, requestedBy])
+	@@index([status, blockedBy])
+	@@index([status])
+}
+
+model DirectChat {
+	id                    Int                  @id @default(autoincrement())
+	friendshipId          Int                  @unique
+	lastMessageId         Int?
+
+	lastMessageRead       Boolean              @default(false)
+
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	friendship            Friendship           @relation(fields: [friendshipId], references: [id], onDelete: Cascade)
+	lastMessage           DirectChatMessage?   @relation("DirectChatLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
+
+	messages              DirectChatMessage[]  @relation("DirectChatMessages")
+
+	@@index([lastMessageId])
+	@@index([updatedAt])
+}
+
+model DirectChatMessage {
+	id                    Int                  @id @default(autoincrement())
+	chatId                Int
+	senderId              Int
+
+	message               String               @db.Text
+	
+	editedAt              DateTime?
+	deletedAt             DateTime?
+
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	chat                  DirectChat           @relation("DirectChatMessages", fields: [chatId], references: [id], onDelete: Cascade)
+	sender                User                 @relation(fields: [senderId], references: [id], onDelete: Cascade)
+	
+	lastMessageForChat    DirectChat[]         @relation("DirectChatLastMessage")
+
+	@@index([chatId, createdAt])
+	@@index([senderId])
+	@@index([createdAt])
+}
+
+model Note {
+	id                    Int                  @id @default(autoincrement())
+	userId                Int
+
+	title                 String
+	content               String               @db.Text
+	
+	createdAt             DateTime             @default(now())
+	updatedAt             DateTime             @updatedAt
+
+	user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@index([userId])
+	@@index([createdAt])
 }

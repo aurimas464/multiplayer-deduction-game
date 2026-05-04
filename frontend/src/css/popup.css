@@ -219,8 +219,93 @@ body>.popup {
 	justify-content: center;
 
 	text-align: center;
-	height: 100%;
+
 	width: 100%;
+	padding: 5px;
+}
+
+.role-reveal-content {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.75rem;
+	text-align: center;
+}
+
+.role-reveal-description {
+	max-width: 30rem;
+	color: var(--text-secondary);
+	font-size: 0.95rem;
+	line-height: 1.35;
+}
+
+.game-finished-popup-content {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 14px;
+	box-sizing: border-box;
+	color: var(--text-primary);
+}
+
+.game-finished-summary {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 10px 12px;
+	border: 1px solid color-mix(in srgb, var(--accent-primary) 55%, transparent);
+	border-radius: 8px;
+	background-color: var(--bg-secondary);
+	text-align: center;
+}
+
+.game-finished-section {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-height: 0;
+}
+
+.game-finished-section h3 {
+	margin: 0;
+	color: var(--accent-primary-light);
+	font-size: 1rem;
+	letter-spacing: 0;
+}
+
+.game-finished-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--accent-primary) 55%, transparent);
+	border-radius: 8px;
+	background-color: var(--bg-primary);
+}
+
+.game-finished-table th,
+.game-finished-table td {
+	padding: 9px 12px;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent);
+	text-align: left;
+	vertical-align: top;
+}
+
+.game-finished-table th {
+	background-color: color-mix(in srgb, var(--accent-primary-dark) 82%, var(--bg-secondary));
+	color: var(--text-primary);
+	font-weight: 800;
+}
+
+.game-finished-table tbody tr:nth-child(even) {
+	background-color: var(--bg-secondary);
+}
+
+.game-finished-table tbody tr:last-child td {
+	border-bottom: none;
 }
 
 p {
@@ -260,6 +345,50 @@ p {
 	width: 100px;
 	height: 100px;
 	color: var(--error-text);
+}
+
+.confirm-popup-icon {
+	width: 100px;
+	height: 100px;
+	flex-shrink: 0;
+}
+
+.confirm-popup-content {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 0.75rem;
+	box-sizing: border-box;
+	gap: 0.75rem;
+	text-align: center;
+}
+
+.confirm-popup-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.75rem;
+	overflow: hidden;
+}
+
+.confirm-message {
+	margin: 0;
+	flex-shrink: 0;
+	color: var(--text-primary);
+	font-size: 1rem;
+	line-height: 1.4;
+}
+
+.confirm-actions {
+	display: flex;
+	gap: 1rem;
+	justify-content: center;
+	align-items: center;
+	margin-top: auto;
+	padding-top: 0.25rem;
 }
 
 .code-display {
@@ -308,4 +437,97 @@ p {
 	pointer-events: none;
 	width: 0;
 	height: 0;
+}
+
+.note-popup {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	gap: 1rem;
+	color: var(--text-primary);
+	padding: 0.75rem;
+	box-sizing: border-box;
+}
+
+.note-popup-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	flex: 1;
+	overflow: hidden;
+	padding: 0.25rem;
+}
+
+.note-form-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.note-input,
+.note-textarea {
+	width: 100%;
+	padding: 10px 12px;
+	background-color: var(--input-bg);
+	color: var(--text-primary);
+	border: 2px solid var(--accent-primary);
+	border-radius: 4px;
+	font-family: "Poppins", sans-serif;
+	font-size: 0.9rem;
+	box-sizing: border-box;
+	resize: none;
+	transition: border-color 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.note-textarea {
+	flex: 1;
+	min-height: 0;
+}
+
+.note-form-group:last-child {
+	flex: 1;
+	min-height: 0;
+}
+
+.note-form-group:last-child .note-textarea {
+	height: 100%;
+}
+
+.note-input:focus,
+.note-textarea:focus {
+	outline: none;
+	border-color: var(--accent-primary-light);
+	background-color: var(--input-bg-focus, var(--bg-primary));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 28%, transparent);
+	animation: note-field-bg-pulse 0.35s ease-out;
+}
+
+.note-input:active,
+.note-textarea:active {
+	animation: note-field-bg-pulse 0.35s ease-out;
+}
+
+@keyframes note-field-bg-pulse {
+	0% {
+		background-color: color-mix(in srgb, var(--accent-primary) 8%, var(--input-bg));
+	}
+	100% {
+		background-color: var(--input-bg-focus, var(--bg-primary));
+	}
+}
+
+.note-input:disabled,
+.note-textarea:disabled {
+	opacity: 0.9;
+	background-color: var(--bg-secondary);
+	cursor: default;
+}
+
+.note-popup-footer {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 0.6rem;
+	margin-top: auto;
+	padding-top: 0.25rem;
 }

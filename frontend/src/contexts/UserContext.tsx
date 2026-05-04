@@ -36,6 +36,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 		}
 	});
 	const [authReady, setAuthReady] = useState(false);
+	const navigate = useNavigate();
+
+	// User cleanup function
+	const cleanupUserData = useCallback(() => {
+		localStorage.removeItem("user");
+		authService.clearAccessToken();
+		setUser(null);
+		navigate("/login", { replace: false });
+	}, [navigate]);
 
 	// Renew user in localStorage on change
 	useEffect(() => {
@@ -67,6 +76,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 			try {
 				const existingToken = authService.getAccessToken();
 				if (!existingToken) {
+					if (!user) {
+						authService.clearAccessToken();
+						return;
+					}
+
 					const refreshed = await authService.refreshToken();
 					if (!refreshed) {
 						if (!isMounted) return;
@@ -106,27 +120,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 		return () => {
 			isMounted = false;
 		};
-	}, []);
-
-	const navigate = useNavigate();
-	
-	// User cleanup function
-	const cleanupUserData = useCallback(() => {
-		localStorage.removeItem("user");
-		authService.clearAccessToken();
-		setUser(null);
-		navigate("/login", { replace: false });
-	}, [navigate]);
+	}, [cleanupUserData, user]);
 
 	// Logout function
-	const logout = async () => {
+	const logout = useCallback(async () => {
 		try {
 			await authService.logout();
 		} catch {
 			// ignore
 		}
 		cleanupUserData();
-	};
+	}, [cleanupUserData]);
 
 	// Set up unauthorized logout handler
 	useEffect(() => {

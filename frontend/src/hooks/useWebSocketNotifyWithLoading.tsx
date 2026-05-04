@@ -46,8 +46,10 @@ export const useWebSocketNotifyWithLoading = () => {
 
 	// Handle messages
 	useEffect(() => {
+		const pendings = pendingsRef.current;
+
 		const unsubscribe = subscribe((msg) => {
-			for (const [loadingPopupId, pending] of pendingsRef.current) {
+			for (const [loadingPopupId, pending] of pendings) {
 				if (pending.done) continue;
 
 				pending.onMessage?.(msg);
@@ -64,7 +66,7 @@ export const useWebSocketNotifyWithLoading = () => {
 		});
 
 		return () => {
-			for (const [loadingPopupId] of pendingsRef.current) {
+			for (const [loadingPopupId] of pendings) {
 				finish(loadingPopupId, (p) => p.onTimeout?.());
 			}
 			unsubscribe();

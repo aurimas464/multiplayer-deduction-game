@@ -1,4 +1,4 @@
-import { ErrorCode } from "../types";
+import { ErrorCode, type ErrorCodeType } from "../types";
 import type { useTranslation } from "../hooks/useTranslation";
 import type { Language } from "../types/settings";
 
@@ -9,8 +9,7 @@ function resolve(t: TranslateFn, key: string, language: Language, params?: Recor
 	return msg === key ? undefined : msg;
 }
 
-export function errorMapper(code: ErrorCode, t: TranslateFn, language: Language, fieldName?: string): string {
-
+export function errorMapper(code: ErrorCodeType, t: TranslateFn, language: Language, fieldName?: string): string {
 	if (fieldName) {
 		const specificKey = `errors.specific.${String(code)}`;
 		const specific = resolve(t, specificKey, language, { field: fieldName });

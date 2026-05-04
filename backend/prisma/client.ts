@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import config from "../src/config";
 
+// Actual database is mysql, but prisma uses mariadb adapter
 const adapter = new PrismaMariaDb({
 	host: config.database.host,
 	port: config.database.port,

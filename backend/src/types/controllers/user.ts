@@ -1,32 +1,46 @@
 import { z } from "zod";
 import { themes, colorThemes, languages } from "../entities/user";
-import { Request, Response } from "express";
 import { ErrorCode } from "..";
 
-export const userUpdateSchema = z
-	.object({
-		username: z.string().optional(),
-		email: z.string().optional(),
-		theme: z.enum(themes).optional(),
-		colorTheme: z.enum(colorThemes).optional(),
-		language: z.enum(languages).optional(),
-		password: z.string().optional(),
-		icon: z.string().optional(),
-	})
-	.strip();
-
-export type UserUpdateDTO = z.infer<typeof userUpdateSchema>;
+export const userPatchSchema = z.object({
+	username: z
+		.string(ErrorCode.INVALID_TYPE)
+		.min(1, ErrorCode.MISSING_FIELDS)
+		.max(191, ErrorCode.INVALID_TOO_LONG)
+		.optional(),
+	email: z
+		.string(ErrorCode.INVALID_TYPE)
+		.min(1, ErrorCode.MISSING_FIELDS)
+		.regex(/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, ErrorCode.INVALID_EMAIL)
+		.max(191, ErrorCode.INVALID_TOO_LONG)
+		.optional(),
+	theme: z
+		.enum(themes, ErrorCode.INVALID_REQUEST)
+		.optional(),
+	colorTheme: z
+		.enum(colorThemes, ErrorCode.INVALID_REQUEST)
+		.optional(),
+	language: z
+		.enum(languages, ErrorCode.INVALID_REQUEST)
+		.optional(),
+	password: z
+		.string(ErrorCode.INVALID_TYPE)
+		.min(1, ErrorCode.MISSING_FIELDS)
+		.min(8, ErrorCode.INVALID_TOO_SHORT)
+		.max(255, ErrorCode.INVALID_TOO_LONG)
+		.optional(),
+	icon: z
+		.string(ErrorCode.INVALID_TYPE)
+		.optional()
+});
 
 export const playerIconsRequestSchema = z.object({
-	playerIds: z
-		.array(z.number(ErrorCode.INVALID_REQUEST).int(ErrorCode.INVALID_REQUEST).positive(ErrorCode.INVALID_REQUEST), ErrorCode.MISSING_FIELDS)
+	playerIds: z.array(
+		z
+			.number(ErrorCode.INVALID_TYPE)
+			.int(ErrorCode.INVALID_TYPE)
+			.positive(ErrorCode.INVALID_TYPE)
+	)
 		.min(1, ErrorCode.MISSING_FIELDS)
-		.max(20, ErrorCode.INVALID_TOO_LONG),
+		.max(20, ErrorCode.INVALID_TOO_LONG)
 });
-export type PlayerIconsRequestDTO = z.infer<typeof playerIconsRequestSchema>;
-
-export interface IUserController {
-	getMe(req: Request, res: Response): Promise<void>;
-	updateUser(req: Request, res: Response): Promise<void>;
-	getIcons(req: Request, res: Response): Promise<void>;
-}

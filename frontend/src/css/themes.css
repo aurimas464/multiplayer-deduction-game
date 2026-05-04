@@ -1,3 +1,45 @@
+@property --bg-primary {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(10, 10, 10);
+}
+
+@property --bg-secondary {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(50, 50, 50);
+}
+
+@property --text-primary {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(245, 245, 245);
+}
+
+@property --text-secondary {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(205, 205, 205);
+}
+
+@property --shadow-color {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgba(0, 0, 0, 0.80);
+}
+
+@property --input-bg {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(30, 30, 30);
+}
+
+@property --hover-gray {
+	syntax: "<color>";
+	inherits: true;
+	initial-value: rgb(100, 100, 100);
+}
+
 :root {
 	--bg-primary: rgb(10, 10, 10);
 	--bg-secondary: rgb(50, 50, 50);
@@ -19,6 +61,15 @@
 	--accent-primary: var(--accent-500);
 	--accent-primary-light: var(--accent-300);
 	--accent-primary-dark: var(--accent-700);
+
+	transition:
+		--bg-primary 800ms ease,
+		--bg-secondary 800ms ease,
+		--text-primary 800ms ease,
+		--text-secondary 800ms ease,
+		--shadow-color 800ms ease,
+		--input-bg 800ms ease,
+		--hover-gray 800ms ease;
 }
 
 [data-theme="light"] {

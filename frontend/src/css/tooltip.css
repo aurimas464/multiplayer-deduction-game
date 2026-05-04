@@ -74,3 +74,26 @@
 	border-width: 8px 8px 8px 0;
 	border-color: transparent var(--accent-primary) transparent transparent;
 }
+
+.role-details-tooltip {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-width: 320px;
+	font-family: "Spectral";
+	font-size: 0.9rem;
+	line-height: 1.35;
+}
+
+.role-details-tooltip p {
+	margin: 0;
+	text-align: center;
+	white-space: normal;
+}
+
+.role-details-tooltip span {
+	align-self: center;
+	color: var(--accent-primary-light);
+	font-weight: 700;
+	text-align: center;
+}

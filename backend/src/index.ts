@@ -7,13 +7,19 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import roleRoutes from "./routes/roleRoutes";
+import friendshipRoutes from "./routes/friendshipRoutes";
+import directChatRoutes from "./routes/chatRoutes";
+import notesRoutes from "./routes/noteRoutes";
+import statisticsRoutes from "./routes/statisticsRoutes";
+
 import { errorMiddleware } from "./middleware/errorMiddleware";
-import { GameWebSocketServer } from "./websocket/WebSocketServer";
+import { WSController } from "./websocket/WSController";
 
 import prisma from "../prisma/client";
 import { ErrorCode } from "./types/index";
 import config from "./config";
 import { seed } from "../prisma/seed";
+import GameService from "./services/gameService";
 
 const app: Express = express();
 const server = createServer(app);
@@ -46,16 +52,21 @@ app.use(
 );
 
 app.use("/api/auth", authRoutes);
-app.use("/api/user", userRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
+app.use("/api/friendships", friendshipRoutes);
+app.use("/api/chats", directChatRoutes);
+app.use("/api/notes", notesRoutes);
+app.use("/api/statistics", statisticsRoutes);
 app.use(errorMiddleware);
 
-const wss = new GameWebSocketServer(server, config);
+const wss = new WSController(server, config);
 
 async function startServer(): Promise<void> {
 	try {
 		await prisma.$connect();
 		await seed();
+		await GameService.cancelAllNonFinishedGames();
 
 		const PORT = config.port;
 		server.listen(PORT, () => {
@@ -68,18 +79,36 @@ async function startServer(): Promise<void> {
 }
 
 // Prisma shutdown handler
-async function shutdown() {
+let isShuttingDown = false;
+async function shutdown(): Promise<void> {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+
 	try {
-		wss.close();
+		await wss.close();
+
+		await new Promise<void>((resolve, reject) => {
+			server.close((err) => {
+				if (err) reject(err);
+				else resolve();
+			});
+		});
+
 		await prisma.$disconnect();
-		server.close(() => process.exit(0));
-	} catch {
+		process.exit(0);
+	} catch (error) {
+		console.error("Shutdown failed:", error);
 		process.exit(1);
 	}
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => {
+	void shutdown();
+});
+
+process.on("SIGTERM", () => {
+	void shutdown();
+});
 
 // Unhandled rejection handler
 process.on("unhandledRejection", (error) => {

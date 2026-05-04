@@ -6,7 +6,6 @@ import { useTranslation } from "../../hooks/useTranslation";
 import { useNavigate } from "react-router-dom";
 import { useWebSocketNotifyWithLoading } from "../../hooks/useWebSocketNotifyWithLoading";
 import { ErrorCode } from "../../types";
-import "../../css/Home.css";
 
 type Props = {
 	popup: PopupData<"joinGame">;
@@ -17,8 +16,10 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const { notifyWithLoading } = useWebSocketNotifyWithLoading();
+	const invitedGameCode = popup.payload.gameCode?.trim().toUpperCase() ?? "";
+	const isInviteMode = invitedGameCode.length === 6;
 
-	const [gameCode, setGameCode] = useState("");
+	const [gameCode, setGameCode] = useState(invitedGameCode);
 	const [cursorPosition, setCursorPosition] = useState(0);
 	const [isFocused, setIsFocused] = useState(false);
 	const [isJoining, setIsJoining] = useState(false);
@@ -42,7 +43,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 					(
 						msg.code === ErrorCode.GAME_NOT_FOUND ||
 						msg.code === ErrorCode.ALREADY_IN_GAME ||
-						msg.code === ErrorCode.GAME_ALREADY_STARTED ||
+						msg.code === ErrorCode.GAME_NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_FULL
 					),
 				onSuccess: (msg) => {
@@ -66,6 +67,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		if (isJoining) return;
+		if (isInviteMode) return;
 
 		const newValue = e.target.value.toUpperCase();
 		setGameCode(newValue);
@@ -80,6 +82,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (isJoining) return;
+		if (isInviteMode && e.key !== "Enter") return;
 
 		const inputElement = inputRef.current;
 		if (!inputElement) return;
@@ -91,7 +94,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 			e.preventDefault();
 
 			let delFrom = start;
-			let delTo = end;
+			const delTo = end;
 
 			if (start === end) {
 				delFrom = Math.max(0, start - 1);
@@ -121,6 +124,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 
 	const handleClick = (index: number) => {
 		if (isJoining) return;
+		if (isInviteMode) return;
 
 		const input = inputRef.current;
 		if (!input) return;
@@ -149,7 +153,11 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 			icon={<UserGroupIcon/>}
 		>
 			<div className="popup-content-center-flex">
-				<h2>{t("components.popups.joinGame.gameCode")}</h2>
+				<h2>
+					{isInviteMode
+						? t("components.popups.joinGame.inviteMessage", { username: popup.payload.inviterUsername ?? t("components.popups.joinGame.defaultUsername") })
+						: t("components.popups.joinGame.gameCode")}
+				</h2>
 
 				<div className="code-display" onClick={() => inputRef.current?.focus()}>
 					{Array.from({ length: 6 }).map((_, i) => (
@@ -165,6 +173,8 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 					<input
 						ref={inputRef}
 						type="text"
+						id="join-game-code"
+						name="joinGameCode"
 						maxLength={6}
 						value={gameCode}
 						onChange={handleInputChange}
@@ -172,7 +182,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 						onFocus={() => setIsFocused(true)}
 						onBlur={() => setIsFocused(false)}
 						className="code-input-hidden"
-						disabled={isJoining}
+						disabled={isJoining || isInviteMode}
 					/>
 				</div>
 
@@ -181,7 +191,7 @@ const JoinGamePopup = ({ popup, onClose }: Props) => {
 					onClick={handleSubmit}
 					disabled={gameCode.trim().length !== 6 || isJoining}
 				>
-					{isJoining ? t("common.loading") : t("components.popups.joinGame.join")}
+					{isJoining ? t("common.loading") : isInviteMode ? t("components.popups.joinGame.accept") : t("components.popups.joinGame.join")}
 				</button>
 			</div>
 		</Popup>

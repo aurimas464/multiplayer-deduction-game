@@ -8,16 +8,16 @@ export const userService = {
 	async getMe(): Promise<ApiResponse<User>> {
 		const res = await apiRequest<User>(api, {
 			method: "GET",
-			url: "/user/getme"
+			url: "/users/getme"
 		});
 
 		return res;
 	},
 
-	async saveSettings(data: UserSettings): Promise<ApiResponse<User>> {
-		const res = await apiRequest<User>(api, {
+	async saveSettings(data: UserSettings): Promise<ApiResponse<void>> {
+		const res = await apiRequest<void>(api, {
 			method: "PATCH",
-			url: "/user/update",
+			url: "/users/patch",
 			data: {
 				theme: data.theme,
 				colorTheme: data.colorTheme,
@@ -26,7 +26,7 @@ export const userService = {
 			},
 		});
 
-		return res;
+		return res as ApiResponse<void>;
 	},
 
 	async getIcons(playerIds: number[]): Promise<ApiResponse<Record<number, string>>> {
@@ -34,7 +34,7 @@ export const userService = {
 
 		const res = await apiRequest<Record<number, string>>(api, {
 			method: "POST",
-			url: "/user/icons",
+			url: "/users/icons",
 			data: { playerIds: ids },
 		});
 

@@ -1,4 +1,4 @@
-import { AppError, ErrorCode } from "../types";
+import { AppError, ErrorCode, type ErrorCodeType, Pagination } from "../types";
 import { z, type ZodType } from "zod";
 import sharp from "sharp";
 
@@ -8,13 +8,82 @@ export function ensureBody(body: unknown): asserts body is Record<string, unknow
 	}
 }
 
-export function parseBody<TSchema extends ZodType>(schema: TSchema, body: unknown): z.infer<TSchema> {
+export function parsePagination(query: unknown): Pagination {
+	if (!query || typeof query !== "object" || Array.isArray(query)) {
+		throw new AppError(ErrorCode.INVALID_REQUEST);
+	}
+
+	const { limit, offset } = query as Record<string, unknown>;
+
+	if (limit === undefined || limit === null || limit === "") {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field: "limit", code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	if (offset === undefined || offset === null || offset === "") {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field: "offset", code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	const parsedLimit = Number(limit);
+	const parsedOffset = Number(offset);
+
+	if (!Number.isInteger(parsedLimit) || parsedLimit < 0) {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field: "limit", code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	if (!Number.isInteger(parsedOffset) || parsedOffset < 0) {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field: "offset", code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	const MAX_LIMIT = 100;
+
+	if (parsedLimit > MAX_LIMIT) {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field: "limit", code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	return { limit: parsedLimit, offset: parsedOffset };
+}
+
+export function parseNumberParam(params: unknown, field: string): number {
+	if (!params || typeof params !== "object" || Array.isArray(params)) {
+		throw new AppError(ErrorCode.INVALID_REQUEST);
+	}
+
+	const value = (params as Record<string, unknown>)[field];
+
+	if (value === undefined || value === null || value === "") {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field, code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	const parsedValue = Number(value);
+
+	if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+		throw new AppError(ErrorCode.INVALID_REQUEST, [
+			{ field, code: ErrorCode.INVALID_REQUEST }
+		]);
+	}
+
+	return parsedValue;
+}
+
+export function validateData<TSchema extends ZodType>(schema: TSchema, body: unknown): z.infer<TSchema> {
 	const result = schema.safeParse(body);
 
 	if (!result.success) {
 		const errors = result.error.issues.map((issue) => {
-			const code = Object.values(ErrorCode).includes(issue.message as ErrorCode)
-				? (issue.message as ErrorCode)
+			const code = Object.values(ErrorCode).includes(issue.message as ErrorCodeType)
+				? (issue.message as ErrorCodeType)
 				: ErrorCode.INVALID_REQUEST;
 
 			const path = issue.path.join(".");

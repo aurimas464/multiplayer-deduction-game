@@ -7,6 +7,8 @@ type PopupContextType = {
 	popups: PopupData[];
 	showPopup: <T extends PopupType>(popup: ShowPopupInput<T>) => string;
 	closePopup: (id: string) => void;
+	bringPopupToFront: (id: string) => boolean;
+	registerBringToFrontHandler: (id: string, handler: () => void) => () => void;
 	getMinimizedSlot: (popupId: string) => { col: number; row: number };
 	releaseMinimizedSlot: (popupId: string) => void;
 	allocateZIndex: () => number;
@@ -36,6 +38,7 @@ export const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 	const counter = useRef(0);
 
 	const minimizedSlotsRef = useRef<Record<string, { col: number; row: number }>>({});
+	const bringToFrontHandlersRef = useRef<Record<string, () => void>>({});
 	const zCounterRef = useRef<number>(BASE_Z_INDEX);
 
 	const allocateZIndex = useCallback(() => {
@@ -50,10 +53,33 @@ export const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 			delete minimizedSlotsRef.current[id];
 		}
 
+		if (bringToFrontHandlersRef.current[id]) {
+			delete bringToFrontHandlersRef.current[id];
+		}
+
 		setPopups(prev => prev.map(p => (p.id === id ? { ...p, closing: true } : p)));
 		window.setTimeout(() => {
 			setPopups(prev => prev.filter(p => p.id !== id));
 		}, 250);
+	}, []);
+
+	const registerBringToFrontHandler = useCallback((id: string, handler: () => void) => {
+		bringToFrontHandlersRef.current[id] = handler;
+
+		return () => {
+			if (bringToFrontHandlersRef.current[id] === handler) {
+				delete bringToFrontHandlersRef.current[id];
+			}
+		};
+	}, []);
+
+	const bringPopupToFront = useCallback((id: string) => {
+		const handler = bringToFrontHandlersRef.current[id];
+
+		if (!handler) return false;
+
+		handler();
+		return true;
 	}, []);
 
 	// Slot allocation (deterministic)
@@ -100,10 +126,12 @@ export const PopupProvider = ({ children }: { children: React.ReactNode }) => {
 		popups,
 		showPopup,
 		closePopup,
+		bringPopupToFront,
+		registerBringToFrontHandler,
 		getMinimizedSlot,
 		releaseMinimizedSlot,
 		allocateZIndex,
-	}), [popups, showPopup, closePopup, getMinimizedSlot, releaseMinimizedSlot, allocateZIndex]);
+	}), [popups, showPopup, closePopup, bringPopupToFront, registerBringToFrontHandler, getMinimizedSlot, releaseMinimizedSlot, allocateZIndex]);
 
 	return <PopupContext.Provider value={value}>{children}</PopupContext.Provider>;
 };

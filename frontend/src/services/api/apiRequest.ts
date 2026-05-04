@@ -6,7 +6,7 @@ import { ErrorCode } from "../../types";
 function isApiResponse<T = unknown>(data: unknown): data is ApiResponse<T> {
 	if (!data || typeof data !== "object") return false;
 
-	const obj = data as any;
+	const obj = data as Record<string, unknown>;
 
 	// Success response (result is optional by type)
 	if (obj.success === true) {
@@ -17,16 +17,18 @@ function isApiResponse<T = unknown>(data: unknown): data is ApiResponse<T> {
 	if (obj.success === false) {
 		if (!Array.isArray(obj.errors)) return false;
 
-		return obj.errors.every((e: any) => {
+		return obj.errors.every((e: unknown) => {
 			if (!e || typeof e !== "object") return false;
 
+			const error = e as Record<string, unknown>;
+
 			// Code must be a valid ErrorCode
-			if (typeof e.code !== "string" || !(Object.values(ErrorCode) as string[]).includes(e.code)) {
+			if (typeof error.code !== "string" || !(Object.values(ErrorCode) as string[]).includes(error.code)) {
 				return false;
 			}
 
 			// Field is optional but must be string if present
-			if ("field" in e && e.field !== undefined && typeof e.field !== "string") {
+			if ("field" in error && error.field !== undefined && typeof error.field !== "string") {
 				return false;
 			}
 
@@ -46,16 +48,22 @@ function normalizeUnknownError(): ApiResponse<never> {
 
 // Normalize expected axios errors into a safe response
 function normalizeKnownError(err: unknown): ApiResponse<never> {
-	const anyErr = err as any;
-	const data = anyErr?.response?.data;
+	const knownError = err as {
+		response?: {
+			data?: unknown;
+		};
+		code?: unknown;
+		message?: unknown;
+	};
+	const data = knownError.response?.data;
 
 	if (isApiResponse(data) && data.success === false) {
 		return data as ApiResponse<never>;
 	}
 
-	const hasResponse = !!anyErr?.response;
-	const axiosCode = anyErr?.code;
-	const msg = typeof anyErr?.message === "string" ? anyErr.message : "";
+	const hasResponse = !!knownError.response;
+	const axiosCode = knownError.code;
+	const msg = typeof knownError.message === "string" ? knownError.message : "";
 
 	const isTimeout =
 		axiosCode === "ECONNABORTED" ||

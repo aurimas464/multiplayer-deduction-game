@@ -1,0 +1,266 @@
+.friends-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	margin: 10px auto;
+	width: 100%;
+	justify-content: center;
+}
+
+.friends-tabs .custom-button.active:hover {
+	background-color: var(--hover-gray);
+	transform: none;
+}
+
+.friend-search {
+	display: flex;
+	position: relative;
+	width: 100%;
+	margin: 1rem auto;
+	max-width: 300px;
+}
+
+.friend-search input {
+	flex: 1;
+	padding: 10px 12px;
+	padding-right: 2.5rem;
+	font-size: 0.9rem;
+	color: var(--text-primary);
+	background-color: var(--input-bg);
+	border: 2px solid var(--accent-primary);
+	border-radius: 4px;
+	box-sizing: border-box;
+	min-width: 50px;
+	font-family: "Poppins", sans-serif;
+	transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.friend-search button {
+	position: absolute;
+	right: 0;
+	top: 0;
+	height: 100%;
+	width: 2.5rem;
+	border: none;
+	background-color: var(--accent-primary);
+	color: var(--text-primary);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background-color 0.2s;
+	border-radius: 0 4px 4px 0;
+}
+
+.friend-search button:hover:not(:disabled) {
+	background-color: var(--accent-primary-dark);
+}
+
+.friend-search button:disabled {
+	background-color: var(--bg-primary);
+	cursor: not-allowed;
+	border: 2px solid var(--accent-primary);
+}
+
+.friend-search button svg {
+	width: 1.25rem;
+	height: 1.25rem;
+}
+
+.friend-filter {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+	max-width: 300px;
+	margin: 0 auto 1rem auto;
+}
+
+.friend-filter input {
+	width: 100%;
+	padding: 10px 12px;
+	padding-left: 2.5rem;
+	font-size: 0.9rem;
+	color: var(--text-primary);
+	background-color: var(--input-bg);
+	border: 2px solid var(--accent-primary);
+	border-radius: 4px;
+	box-sizing: border-box;
+	min-width: 50px;
+	font-family: "Poppins", sans-serif;
+	transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.filter-icon {
+	position: absolute;
+	left: 0.5rem;
+	width: 1rem;
+	height: 1rem;
+	color: var(--icon-color);
+	pointer-events: none;
+}
+
+.friends-card-list {
+	display: flex;
+	gap: 1rem;
+	flex-direction: column;
+	width: 100%;
+	margin-bottom: 1rem;
+}
+
+.friends-request-section {
+	width: 100%;
+	margin-bottom: 0.5rem;
+}
+
+.friends-section-title {
+	margin: 0 0 0.5rem;
+	text-align: center;
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: var(--accent-primary-light);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.friend-card-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.75rem;
+	border: 1px solid var(--border-color);
+	border-radius: 0.5rem;
+	background-color: var(--bg-secondary);
+}
+
+.friend-card-item.blocked {
+	opacity: 0.9;
+}
+
+.friend-name,
+.request-name {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+	font-weight: 500;
+	color: var(--text-color-primary);
+	font-family: "Poppins", sans-serif;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.friend-name-row {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.friend-mini-icon {
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	object-fit: cover;
+	flex-shrink: 0;
+}
+
+.friend-online-dot {
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background-color: var(--text-secondary);
+}
+
+.friend-online-dot.online {
+	background-color: var(--success-text);
+}
+
+.friend-online-dot.offline {
+	background-color: var(--text-secondary);
+}
+
+.friend-actions,
+.request-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}
+
+.friend-action-button,
+.accept-button,
+.reject-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border: none;
+	border-radius: 50%;
+	cursor: pointer;
+	transition: transform 0.2s ease, background-color 0.2s ease;
+	color: var(--text-primary);
+}
+
+.friend-action-button {
+	background-color: var(--accent-primary-dark);
+}
+
+.friend-action-button:hover {
+	background-color: var(--accent-primary);
+	transform: scale(1.15);
+}
+
+.friend-action-button-danger {
+	background-color: var(--error-text);
+	border: 1px solid var(--accent-primary);
+}
+
+.friend-action-button-danger:hover {
+	background-color: color-mix(in srgb, var(--error-text) 78%, var(--bg-primary) 22%);
+	border-color: var(--accent-primary);
+}
+
+.accept-button {
+	background-color: var(--success-text);
+}
+
+.reject-button {
+	background-color: var(--error-text);
+}
+
+.accept-button:hover,
+.reject-button:hover {
+	transform: scale(1.15);
+}
+
+.friend-action-button svg,
+.accept-button svg,
+.reject-button svg {
+	width: 1rem;
+	height: 1rem;
+	color: var(--text-primary);
+}
+
+.friends-tabs .custom-button.active {
+	opacity: 0.75;
+	color: var(--text-primary);
+	background-color: var(--bg-secondary);
+	transform: none;
+	pointer-events: none;
+	cursor: default;
+}
+
+.friends-tabs .custom-button.active:hover {
+	background-color: var(--bg-secondary);
+	transform: none;
+}
+
+.no-friends {
+	text-align: center;
+	color: var(--text-secondary);
+	padding: 2rem 0;
+}

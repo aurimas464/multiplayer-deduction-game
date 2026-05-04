@@ -6,21 +6,6 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import "../../css/popup.css";
 
-type PopupProps = {
-	id: string;
-	children: React.ReactNode;
-	onClose: () => void;
-	title: string;
-	position: PopupPosition;
-	width: number;
-	height: number;
-	icon?: React.ReactNode;
-	autoCloseDelay?: number;
-	minimizable?: boolean;
-	closable?: boolean;
-	closing?: boolean;
-}
-
 const BASE_Z_INDEX = 1000;
 
 const MIN_WIDTH = 300;
@@ -100,6 +85,21 @@ const clampToViewport = (pos: { top: number; left: number }, size: { width: numb
 	return { top, left };
 };
 
+type PopupProps = {
+	id: string;
+	children: React.ReactNode;
+	onClose: () => void;
+	title: string;
+	position: PopupPosition;
+	width: number;
+	height: number;
+	icon?: React.ReactNode;
+	autoCloseDelay?: number;
+	minimizable?: boolean;
+	closable?: boolean;
+	closing?: boolean;
+}
+
 const Popup = ({ 
 	id, 
 	children, 
@@ -117,7 +117,7 @@ const Popup = ({
 	// Get sidebar position for minimized popups
 	const { right: sidebarRight } = useSidebarPosition();
 
-	const { getMinimizedSlot, releaseMinimizedSlot, allocateZIndex } = usePopup();
+	const { getMinimizedSlot, releaseMinimizedSlot, allocateZIndex, registerBringToFrontHandler } = usePopup();
 
 	const popupId = id;
 
@@ -127,15 +127,20 @@ const Popup = ({
 	const [isResizing, setIsResizing] = useState(false);
 	const [isMinimized, setIsMinimized] = useState(false);
 	const [isClosing, setIsClosing] = useState(false);
+	const [isRestoring, setIsRestoring] = useState(false);
 
 	const isClosingRef = useRef(false);
 	useEffect(() => {
 		isClosingRef.current = isClosing;
 	}, [isClosing]);
 
+	const [initialPopupState] = useState(() => ({
+		position: calculateInitialPosition(position, width, height),
+		size: { width, height },
+	}));
 
-	const [popupPosition, setPopupPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-	const [popupSize, setPopupSize] = useState<{ width: number; height: number }>({ width, height });
+	const [popupPosition, setPopupPosition] = useState<{ top: number; left: number }>(initialPopupState.position);
+	const [popupSize, setPopupSize] = useState<{ width: number; height: number }>(initialPopupState.size);
 	const [zIndex, setZIndex] = useState<number>(BASE_Z_INDEX);
 
 	const rndRef = useRef<Rnd>(null);
@@ -147,10 +152,7 @@ const Popup = ({
 	const originalStateRef = useRef<{
 		position: { top: number; left: number };
 		size: { width: number; height: number };
-	}>({
-		position: { top: 0, left: 0 },
-		size: { width, height },
-	});
+	}>(initialPopupState);
 
 	const closeTimerRef = useRef<number | null>(null);
 	const autoCloseTimerRef = useRef<number | null>(null);
@@ -177,10 +179,14 @@ const Popup = ({
 		setZIndex(allocateZIndex());
 	}, [allocateZIndex]);
 
-	const bringToFront = () => {
+	const bringToFront = useCallback(() => {
 		if (isMinimized || isClosing) return;
 		setZIndex(allocateZIndex());
-	};
+	}, [allocateZIndex, isClosing, isMinimized]);
+
+	useEffect(() => {
+		return registerBringToFrontHandler(popupId, bringToFront);
+	}, [popupId, bringToFront, registerBringToFrontHandler]);
 
 	// Open animation
 	useEffect(() => {
@@ -209,7 +215,7 @@ const Popup = ({
 			position: initialPos,
 			size: { width, height },
 		};
-	}, []);
+	}, [height, position, width]);
 
 	const handleClose = useCallback(() => {
 		if (isClosingRef.current) return;
@@ -282,7 +288,7 @@ const Popup = ({
 	}, [autoCloseDelay, isClosing, handleClose]);
 
 	// Minimize popup
-	const handleMinimize = (e: React.MouseEvent) => {
+	const handleMinimize = (e: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
 		e.stopPropagation();
 		if (isClosing) return;
 
@@ -315,6 +321,7 @@ const Popup = ({
 
 		setIsAnimating(true);
 		isRestoringPosition.current = true;
+		setIsRestoring(true);
 
 		releaseMinimizedSlot(popupId);
 
@@ -333,6 +340,7 @@ const Popup = ({
 		setTimeout(() => {
 			setIsAnimating(false);
 			isRestoringPosition.current = false;
+			setIsRestoring(false);
 		}, 300);
 	};
 
@@ -430,7 +438,7 @@ const Popup = ({
 				"popup",
 				isAppearing ? "appearing" : "",
 				isMinimized ? "minimized" : "",
-				isRestoringPosition.current ? "restoring" : "",
+				isRestoring ? "restoring" : "",
 				isAnimating ? "animating" : "",
 				isDragging ? "dragging" : "",
 				isResizing ? "resizing" : "",
@@ -493,7 +501,7 @@ const Popup = ({
 								onClick={handleMinimize}
 								onTouchEnd={e => {
 									e.preventDefault();
-									handleMinimize(e as any);
+									handleMinimize(e);
 								}}
 								disabled={isClosing}
 							>

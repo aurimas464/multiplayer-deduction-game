@@ -1,23 +1,57 @@
 import { ArrowRightStartOnRectangleIcon, PlayIcon, TrophyIcon, UserGroupIcon } from "@heroicons/react/24/outline";
-import { useNavigate } from "react-router-dom";
-import { useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { useUser } from "../contexts/UserContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { usePopup } from "../contexts/PopupContext";
 import { useWebSocketNotifyWithLoading } from "../hooks/useWebSocketNotifyWithLoading";
 import { useWebSocket } from "../contexts/WebSocketContext";
 import { ErrorCode } from "../types";
+import type { GameFinishedPopupPayload } from "../types/popup";
 import "../css/Home.css";
 
+type HomeLocationState = {
+	gameFinished?: GameFinishedPopupPayload;
+};
+
 const Home = () => {
-	const { logout } = useUser();
+	const { logout, user } = useUser();
 	const { t } = useTranslation();
 	const { showPopup } = usePopup();
 	const { notifyWithLoading } = useWebSocketNotifyWithLoading();
 	const { sendMessage } = useWebSocket();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const welcomeTitle = user?.username
+		? `${t("pages.home.title")}, ${user.username}!`
+		: `${t("pages.home.title")}!`;
 
 	const loadingRef = useRef(false);
+	const shownFinishedKeyRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		const state = location.state as HomeLocationState | null;
+		const gameFinished = state?.gameFinished;
+		if (!gameFinished) return;
+
+		const key = `${gameFinished.winner}-${gameFinished.winnerPlayerIds.join(".")}-${gameFinished.players.length}-${gameFinished.timeline.length}`;
+		if (shownFinishedKeyRef.current === key) return;
+		shownFinishedKeyRef.current = key;
+
+		const popupHeight = Math.max(520, Math.min(window.innerHeight - 48, 260 + gameFinished.players.length * 30 + Math.min(gameFinished.timeline.length, 12) * 28));
+		const popupWidth = gameFinished.timeline.length > 0 ? 820 : 680;
+
+		showPopup({
+			type: "gameFinished",
+			title: t("pages.game.finished.title"),
+			payload: gameFinished,
+			width: popupWidth,
+			height: popupHeight,
+			position: "center"
+		});
+
+		navigate("/home", { replace: true, state: null });
+	}, [location.state, navigate, showPopup, t]);
 
 	const handleCreateGame = () => {
 		notifyWithLoading(
@@ -28,7 +62,7 @@ const Home = () => {
 						msg.code === ErrorCode.GAME_NOT_CREATED ||
 						msg.code === ErrorCode.GAME_NOT_FOUND ||
 						msg.code === ErrorCode.ALREADY_IN_GAME ||
-						msg.code === ErrorCode.GAME_ALREADY_STARTED ||
+						msg.code === ErrorCode.GAME_NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_FULL),
 
 				onMessage: (msg) => {
@@ -57,7 +91,7 @@ const Home = () => {
 		<div className="home-page">
 			<div className="border-container1">
 				<div className="border-container2">
-					<h1>{t("pages.home.title")}!</h1>
+					<h1>{welcomeTitle}</h1>
 				</div>
 			</div>
 
@@ -72,9 +106,9 @@ const Home = () => {
 					<span className="game-label">{t("pages.home.join")}</span>
 				</button>
 
-				<button className="game-button button-66">
+				<button className="game-button button-66" onClick={() => navigate("/statistics")}>
 					<TrophyIcon className="game-icon" />
-					<span className="game-label">{t("pages.home.leaderboard")}</span>
+					<span className="game-label">{t("pages.home.statistics")}</span>
 				</button>
 
 				<button onClick={logout} className="game-button logout-button button-33">

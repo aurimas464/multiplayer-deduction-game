@@ -1,15 +1,16 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "./UserContext";
 import { authService } from "../services/auth";
 import { ErrorCode } from "../types/index";
 import type { ClientMessage, ServerMessage } from "../types/websocket";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type Handler = (msg: ServerMessage) => void;
 
 type WebSocketContextType = {
-	sendMessage: (msg: ClientMessage, loadingPopup?: Boolean) => Promise<boolean>;
+	sendMessage: (msg: ClientMessage, loadingPopup?: boolean) => Promise<boolean>;
 	subscribe: (handler: Handler) => () => void;
+	isReady: boolean;
 };
 
 // Starts as undefined so that cases where app is used without context throws an error
@@ -27,12 +28,16 @@ const getWebSocketUrl = () => {
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
 	const { user, authReady, logout } = useUser();
 	const navigate = useNavigate();
+	const location = useLocation();
 
 	const webSocketRef = useRef<WebSocket | null>(null);
+	const [isReady, setIsReadyState] = useState(false);
 
 	const reconnectTimerRef = useRef<number | null>(null);
 	const reconnectAttemptRef = useRef(0);
 	const refreshInFlightRef = useRef(false);
+	const gameRecoveryInFlightRef = useRef(false);
+	const finishedGameCodesRef = useRef<Set<string>>(new Set());
 
 	const queueRef = useRef<ServerMessage[]>([]);
 	const drainingRef = useRef(false);
@@ -45,12 +50,15 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
 	const authReadyRef = useRef(authReady);
 	const userRef = useRef(user);
+	const locationPathRef = useRef(location.pathname);
 
 	const userId = user?.id ?? null;
 
 	useEffect(() => {
+		const waitingForReady = waitingForReadyRef.current;
+
 		return () => {
-			for (const waiter of waitingForReadyRef.current) {
+			for (const waiter of waitingForReady) {
 				window.clearTimeout(waiter.timerId);
 				try {
 					waiter.resolve(false);
@@ -58,7 +66,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 					// ignore
 				}
 			}
-			waitingForReadyRef.current.clear();
+			waitingForReady.clear();
 		};
 	}, []);
 
@@ -66,6 +74,10 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 		authReadyRef.current = authReady;
 		userRef.current = user;
 	}, [authReady, user]);
+
+	useEffect(() => {
+		locationPathRef.current = location.pathname;
+	}, [location.pathname]);
 
 	const notifyWaitingOk = useCallback((ok: boolean) => {
 		for (const waiter of waitingForReadyRef.current) {
@@ -81,6 +93,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
 	const setReady = useCallback((ok: boolean) => {
 		socketReadyRef.current = ok;
+		setIsReadyState(ok);
 		notifyWaitingOk(ok);
 	}, [notifyWaitingOk]);
 
@@ -152,8 +165,10 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 				for (const handler of subscribersRef.current) {
 					try {
 						handler(msg);
-					} catch {
-						// ignore
+					} catch (error) {
+						if (import.meta.env.VITE_ENV === "development") {
+							console.error("WS handler failed", msg.type, error);
+						}
 					}
 				}
 			}
@@ -271,7 +286,19 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 					break;
 				}
 				case "RECOVER_GAME_OK": {
-					navigate(`/game-lobby/${msg.gameCode}`, { replace: true });
+					gameRecoveryInFlightRef.current = false;
+					navigate(msg.state === "inGame" ? `/game/${msg.gameCode}` : `/game-lobby/${msg.gameCode}`, { replace: true });
+					break;
+				}
+				case "RECOVER_GAME_NONE": {
+					gameRecoveryInFlightRef.current = false;
+					if (locationPathRef.current.startsWith("/game/")) {
+						const gameCode = decodeURIComponent(locationPathRef.current.split("/")[2] ?? "");
+						if (finishedGameCodesRef.current.has(gameCode)) {
+							break;
+						}
+					}
+					navigate("/home", { replace: true });
 					break;
 				}
 				case "TOKEN_REQUIRED": {
@@ -339,6 +366,8 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 				}
 				case "ERROR": {
 					enqueue(msg);
+					const currentGameCode = locationPathRef.current.startsWith("/game/") ? decodeURIComponent(locationPathRef.current.split("/")[2] ?? "") : "";
+					const currentGameEnded = currentGameCode.length > 0 && finishedGameCodesRef.current.has(currentGameCode);
 
 					if (msg.code === ErrorCode.UNAUTHORIZED) {
 						setReady(false);
@@ -346,6 +375,32 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 						logout();
 					}
 
+					if (
+						(
+							msg.code === ErrorCode.GAME_NOT_FOUND ||
+							msg.code === ErrorCode.GAME_NOT_IN_LOBBY ||
+							msg.code === ErrorCode.PLAYER_NOT_IN_LOBBY
+						) &&
+						(locationPathRef.current.startsWith("/game/") || locationPathRef.current.startsWith("/game-lobby/")) && !currentGameEnded && !gameRecoveryInFlightRef.current
+					) {
+						gameRecoveryInFlightRef.current = true;
+
+						if (!sendMessageToSocket({ type: "RECOVER_GAME" })) {
+							gameRecoveryInFlightRef.current = false;
+						}
+					}
+
+					break;
+				}
+				case "GAME_FINISHED": {
+					if (locationPathRef.current.startsWith("/game/")) {
+						const gameCode = decodeURIComponent(locationPathRef.current.split("/")[2] ?? "");
+						if (gameCode.length > 0) {
+							finishedGameCodesRef.current.add(gameCode);
+						}
+					}
+
+					enqueue(msg);
 					break;
 				}
 				default:
@@ -369,7 +424,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
 		ws.onerror = (error) => {
 			if (import.meta.env.VITE_ENV === "development") {
-				console.log("WebSocket error:", error);
+				console.error("WebSocket error:", error);
 			}
 		};
 	}, [ authReady, user, enqueue, closeSocket, clearReconnectTimer, scheduleReconnect, logout, sendMessageToSocket, setReady, navigate]);
@@ -401,8 +456,9 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 		() => ({
 			sendMessage,
 			subscribe,
+			isReady,
 		}),
-		[sendMessage, subscribe]
+		[sendMessage, subscribe, isReady]
 	);
 
 	return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>;

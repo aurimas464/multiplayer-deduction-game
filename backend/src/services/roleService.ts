@@ -1,35 +1,41 @@
-import { RoleModel } from "../models/role";
-import { ResponseRole, responseRolesSchema } from "../types/entities/role";
+import { RoleModel } from "../repositories/roleRepository";
+import { ResponseRoles, responseRolesSchema } from "../types/entities/role";
 import { AppError, ErrorCode } from "../types";
-import { GameModelTransaction } from "../models/game";
+import { GameModelTransaction } from "../repositories/gameRepository";
+import { ParticipantModelTransaction } from "../repositories/participantRepository";
 import prisma from "../../prisma/client";
-import { GameRoleSetupModelTransaction } from "../models/gameRoleSetup";
+import { GameRoleSetupModelTransaction } from "../repositories/gameRoleSetupRepository";
 
 class RoleService {
-	public async getRoles(): Promise<ResponseRole[]> {
-		const roles = await RoleModel.getRoles();
+	async getRoles(): Promise<ResponseRoles> {
+		const roles = await RoleModel.listRoles();
 		return responseRolesSchema.parse(roles);
 	}
-
-	public async updateRoleSettings(playerId: number, gameId: number, roleSettings: Record<number, number>): Promise<boolean> {
+	
+	async updateRoleSettings(playerId: number, gameId: number, roleSettings: Record<number, number>): Promise<boolean> {
 		return prisma.$transaction(async (tx) => {
 			const gamesModel = GameModelTransaction(tx);
+			const participantsModel = ParticipantModelTransaction(tx);
 			const gameRoleSetupModel = GameRoleSetupModelTransaction(tx);
 
-            const lobby = await gamesModel.findGameWithParticipants(gameId);
-            if (!lobby) {
+            const game = await gamesModel.findByGameId(gameId);
+            if (!game) {
 				throw new AppError(ErrorCode.GAME_NOT_FOUND);
 			}
-			if (lobby.status !== "lobby") {
-				throw new AppError(ErrorCode.GAME_ALREADY_STARTED);
+			if (game.status !== "lobby") {
+				throw new AppError(ErrorCode.GAME_NOT_IN_LOBBY);
 			}
 
-			const myParticipant = lobby.participants.find((p) => p.playerId === playerId);
+			const existingParticipants = await participantsModel.findByGameId(gameId);
+			const myParticipant = existingParticipants.find((p) => p.playerId === playerId);
 			if (!myParticipant || myParticipant.seatNr !== 1) {
 				throw new AppError(ErrorCode.NOT_GAME_LEADER);
 			}
 
-			return await gameRoleSetupModel.upsertRoleSettings(gameId, roleSettings);
+			for (const [roleId, count] of Object.entries(roleSettings)) {
+				await gameRoleSetupModel.upsert({gameId, roleId: Number(roleId), count});
+			}
+			return true;
 		});
 	}
 }

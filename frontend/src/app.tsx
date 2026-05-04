@@ -11,6 +11,8 @@ import PopupRenderer from "./components/popups/PopupRenderer";
 import GameLobby from "./pages/GameLobby";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
 import WebSocketUiBridge from "./contexts/WebSocketUiBridge";
+import Game from "./pages/Game";
+import Statistics from "./pages/Statistics";
 
 const ProtectedRoute = () => {
 	const { user, authReady } = useUser();
@@ -44,6 +46,8 @@ const App = () => {
 									<Route element={<BaseLayout />}>
 										<Route path="/home" element={<Home />} />
 										<Route path="/game-lobby/:gameCode" element={<GameLobby />} />
+										<Route path="/game/:gameCode" element={<Game />} />
+										<Route path="/statistics" element={<Statistics />} />
 									</Route>
 								</Route>
 							</Route>

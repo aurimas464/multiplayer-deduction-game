@@ -7,6 +7,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -21,7 +22,7 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.2.0",
-    "@prisma/client": "^6.19.2",
+    "@prisma/client": "^7.6.0",
     "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -31,22 +32,31 @@
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.4.5",
     "sharp": "^0.34.5",
-    "uuid": "^13.0.0",
+    "uuid": "^14.0.0",
     "ws": "^8.19.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@express-rate-limit/tsconfig": "^1.0.2",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.6.0",
     "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "dotenv": "^17.2.3",
-    "prisma": "^6.19.2",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "prisma": "^7.6.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.0"
+  },
+  "overrides": {
+    "@hono/node-server": "^1.19.13"
   }
 }

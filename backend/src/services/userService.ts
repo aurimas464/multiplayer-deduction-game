@@ -1,21 +1,22 @@
-import { UserModel } from "../models/user";
-import { ResponseUser, responseUserSchema } from "../types/entities/user";
-import { UserUpdateDTO } from "../types/controllers/user";
-import { PlayerModel } from "../models/player";
+import { UserModel } from "../repositories/userRepository";
+import { ResponseUser, responseUserSchema, PatchUser } from "../types/entities/user";
+import { PlayerModel } from "../repositories/playerRepository";
 import { validateIcon } from "../utils/validation";
 import { ErrorCode } from "../types";
 import { AppError } from "../types/index";
-import { computeIconEtag } from "../utils/iconEtag";
+import crypto from "crypto";
 
 class UserService {
-	async getMe(userId: number): Promise<ResponseUser | null> {
+	async getMe(userId: number): Promise<ResponseUser> {
 		const user = await UserModel.findById(userId);
 		const player = await PlayerModel.findByUserId(userId);
-		if (!user || !player) return null;
+		if (!user || !player){
+			throw new AppError(ErrorCode.USER_NOT_FOUND);
+		}
 		return responseUserSchema.parse({ ...user, player });
 	}
 
-	async updateUser(userId: number, data: UserUpdateDTO): Promise<boolean> {
+	async patchUser(data: PatchUser): Promise<void> {
 		let iconEtag: string | undefined;
 
 		if (data.icon !== undefined && data.icon !== "") {
@@ -26,26 +27,30 @@ class UserService {
 			}
 
 			data.icon = result.value;
-			iconEtag = computeIconEtag(result.value);
+			iconEtag = this.computeIconEtag(result.value);
 		}
 
-		return await UserModel.update(userId, data, iconEtag);
+		await UserModel.patch({...data, iconEtag});
 	}
 
 	async getIconEtag(playerId: number): Promise<string | null> {
-		const player = await PlayerModel.findByUserId(playerId);
-		return player?.iconEtag ?? null;
+		return await PlayerModel.findIconEtagByPlayerId(playerId);
 	}
 
 	async getManyIcons(playerIds: number[]): Promise<Record<number, string>> {
-		const icons = await PlayerModel.getIconsDataUrlByPlayerIds(playerIds);
+		const limitedIds = [...new Set(playerIds)].slice(0, 20);
+		const icons = await PlayerModel.findIconDataByPlayerIds(limitedIds);
 
 		const result: Record<number, string> = {};
-		for (const [playerId, icon] of icons) {
-			result[playerId] = icon;
+		for (const { id, icon } of icons) {
+			result[id] = icon;
 		}
 
 		return result;
+	}
+
+	computeIconEtag(icon: string): string {
+		return crypto.createHash("sha256").update(icon.trim(), "utf8").digest("hex");
 	}
 }
 
