@@ -302,15 +302,15 @@ const Statistics = () => {
 
 							<section className="statistics-lists">
 								{renderList(
+									t("pages.statistics.sections.topRoles"),
+									activeStats.games.topRoles.map((item) => ({ label: formatRole(item.roleKey), count: item.count }))
+								)}
+								{renderList(
 									t("pages.statistics.sections.victories"),
 									activeStats.games.victories.map((item) => ({
 										label: labelOrFallback(`pages.gameLobby.settings.alignments.${item.alignment}`, item.alignment),
 										count: item.count
 									}))
-								)}
-								{renderList(
-									t("pages.statistics.sections.topRoles"),
-									activeStats.games.topRoles.map((item) => ({ label: formatRole(item.roleKey), count: item.count }))
 								)}
 								{renderList(
 									t("pages.statistics.sections.topActions"),
