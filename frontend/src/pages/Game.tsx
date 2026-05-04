@@ -585,7 +585,19 @@ const Game = () => {
 		pendingActionRef.current = true;
 		pendingActionTypeRef.current = "skip";
 		setSubmittedActionPhaseKey(null);
+		showActionLoadingPopup();
 	};
+
+	const submitTargetAction = useCallback((actionType: Exclude<PlayerActionName, "skip">, targetPlayerId: number) => {
+		if (!gameState || gameState.currentPhase === "day") return;
+		if (!gameState.availableActions.includes(actionType)) return;
+
+		sendMessage({ type: "PLAYER_ACTION", action: actionType, targetPlayerId });
+		pendingActionRef.current = true;
+		pendingActionTypeRef.current = actionType;
+		setSubmittedActionPhaseKey(null);
+		showActionLoadingPopup();
+	}, [gameState, sendMessage, showActionLoadingPopup]);
 
 	const openSelectionPopup = useCallback((actionConfigs: ActionConfig[]) => {
 		if (!gameState || !isAlive) return;
@@ -604,16 +616,15 @@ const Game = () => {
 				actionType: actionConfigs[0].actionType,
 				actionLabel: actionConfigs[0].label,
 				actions: actionConfigs,
-				players
+				players,
+				onSubmit: submitTargetAction
 			},
 			width: 750,
 			height: 550,
 			position: "center"
 		});
 
-		pendingActionRef.current = true;
-		pendingActionTypeRef.current = null;
-	}, [aliveTargets, gameState, isAlive, playerIcons, showPopup, t]);
+	}, [aliveTargets, gameState, isAlive, playerIcons, showPopup, submitTargetAction, t]);
 
 	const formatTimeRemaining = (ms: number) => {
 		const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
