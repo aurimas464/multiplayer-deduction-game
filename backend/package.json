@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "tsc && prisma generate",
+    "start": "node dist/src/index.js",
     "lint": "eslint src --ext .ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -34,7 +34,9 @@
     "sharp": "^0.34.5",
     "uuid": "^14.0.0",
     "ws": "^8.19.0",
-    "zod": "^4.3.5"
+    "zod": "^4.3.5",
+    "dotenv": "^17.2.3",
+    "prisma": "^7.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -46,10 +48,8 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
-    "dotenv": "^17.2.3",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",
-    "prisma": "^7.6.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",

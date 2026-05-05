@@ -1,5 +1,5 @@
 import { AppError, ErrorCode } from "../types";
-import type { Game, RoleDistributionMode } from "../types/entities/game";
+import type { Game, GameSessionSnapshot, RoleDistributionMode } from "../types/entities/game";
 import { GameModel, GameModelTransaction } from "../repositories/gameRepository";
 import { ParticipantModel, ParticipantModelTransaction } from "../repositories/participantRepository";
 import { ActionModelTransaction } from "../repositories/actionRepository";
@@ -43,6 +43,24 @@ class GameService {
 
 	async latestActiveGameForPlayer(playerId: number): Promise<Game | null> {
 		return GameModel.findActiveGameByPlayerId(playerId);
+	}
+
+	async getLobbyGameSnapshot(gameId: number): Promise<GameSessionSnapshot | null> {
+		const snapshot = await GameModel.findSessionSnapshot(gameId);
+		if (!snapshot || (snapshot.game.status !== "lobby" && snapshot.game.status !== "starting")) {
+			return null;
+		}
+
+		return snapshot;
+	}
+
+	async getInProgressGameSnapshot(gameId: number): Promise<GameSessionSnapshot | null> {
+		const snapshot = await GameModel.findSessionSnapshot(gameId);
+		if (!snapshot || snapshot.game.status !== "in_progress") {
+			return null;
+		}
+
+		return snapshot;
 	}
 
 	async joinGame(playerId: number, gameId: number): Promise<Participant> {
@@ -180,7 +198,7 @@ class GameService {
 				const participant = shuffledParticipants[i];
 				const roleId = rolePool[i];
 
-				await ParticipantModel.patch({
+				await participantsModel.patch({
 					gameId: participant.gameId,
 					playerId: participant.playerId,
 					roleId

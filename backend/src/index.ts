@@ -3,6 +3,7 @@ import { createServer } from "http";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import path from "path";
 
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
@@ -58,6 +59,15 @@ app.use("/api/friendships", friendshipRoutes);
 app.use("/api/chats", directChatRoutes);
 app.use("/api/notes", notesRoutes);
 app.use("/api/statistics", statisticsRoutes);
+
+if (process.env.NODE_ENV === "production") {
+	const clientPath = path.resolve(process.cwd(), "public");
+	app.use(express.static(clientPath));
+	app.get(/^\/(?!api).*/, (_, res) => {
+		res.sendFile(path.join(clientPath, "index.html"));
+	});
+}
+
 app.use(errorMiddleware);
 
 const wss = new WSController(server, config);

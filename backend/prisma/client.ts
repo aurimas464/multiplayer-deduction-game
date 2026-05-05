@@ -9,6 +9,7 @@ const adapter = new PrismaMariaDb({
 	user: config.database.user,
 	password: config.database.password,
 	database: config.database.database,
+	ssl: config.database.ssl
 });
 
 const prisma = new PrismaClient({ adapter });

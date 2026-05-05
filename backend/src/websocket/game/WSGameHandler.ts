@@ -1,7 +1,7 @@
 import { AppError, ErrorCode } from "../../types";
 import type { ClientMessage } from "../../types/websocket/client";
 import type { ServerMessage } from "../../types/websocket/server";
-import type { ConnectedUserSocket, FinishedGameWinner, GameFinishedPlayer, GameStatePlayer, InGameDayActionHistory, LobbyPlayer, MetaSettings, PlayerAction, PlayerActionType, PlayerState, RoleSettings } from "../../types/websocket/types";
+import type { BotSettings, ConnectedUserSocket, FinishedGameWinner, GameFinishedPlayer, GameStatePlayer, InGameDayActionHistory, LobbyPlayer, LobbySession, MetaSettings, PlayerAction, PlayerActionType, PlayerState, RoleSettings } from "../../types/websocket/types";
 import type { CreateGameChatMessage, PhaseType, ResponseGameChatMessage } from "../../types/entities/gameChatMessage";
 
 import type { BotDifficulty, BotPlaystyle } from "../../types/entities/gameBotSetup";
@@ -67,6 +67,123 @@ export class WSGameHandler {
 			this.lobbySessions.stop(),
 			this.gameSessions.stop()
 		]);
+	}
+
+	private async ensureLobbySession(gameId: number): Promise<boolean> {
+		if (this.lobbySessions.getLobbyState(gameId)) {
+			return true;
+		}
+
+		const snapshot = await GameService.getLobbyGameSnapshot(gameId);
+		if (!snapshot) {
+			return false;
+		}
+
+		this.lobbySessions.create(gameId, snapshot.game.gameCode, {
+			maxPlayers: snapshot.game.maxPlayers,
+			minPlayers: snapshot.game.minPlayers,
+			daySeconds: snapshot.game.daySeconds,
+			votingSeconds: snapshot.game.votingSeconds,
+			nightSeconds: snapshot.game.nightSeconds,
+			tieBehavior: snapshot.game.tieBehavior,
+			voteCountVisibility: snapshot.game.voteCountVisibility,
+			anonymousVoting: snapshot.game.anonymousVoting,
+			roleRevealOnDeath: snapshot.game.roleRevealOnDeath,
+			roleDistributionMode: snapshot.game.roleDistributionMode
+		}, snapshot.roleSettings, snapshot.botSettings as BotSettings);
+
+		for (const participant of snapshot.participants) {
+			this.lobbySessions.upsertPlayer(gameId, participant, participant.username, participant.iconEtag, participant.type);
+		}
+
+		return true;
+	}
+
+	private async ensureInGameSession(ws: ConnectedUserSocket, gameId: number): Promise<boolean> {
+		const playerId = ws.userToken?.playerId;
+		if (!playerId) {
+			return false;
+		}
+
+		const existingPhase = this.gameSessions.getPhaseAndDay(gameId);
+		if (existingPhase) {
+			const joined = this.gameSessions.joinSession(ws, gameId, playerId);
+			return Boolean(joined || this.gameSessions.getGameState(gameId, playerId));
+		}
+
+		const snapshot = await GameService.getInProgressGameSnapshot(gameId);
+		if (!snapshot) {
+			return false;
+		}
+
+		const currentParticipant = snapshot.participants.find((participant) => participant.playerId === playerId);
+		if (!currentParticipant) {
+			return false;
+		}
+
+		const roles = this.lobbySessions.getRoles().length > 0 ? this.lobbySessions.getRoles() : await RoleService.getRoles();
+		const rolesById = new Map(roles.map((role) => [role.id, role]));
+		const rolesByPlayerId = new Map<number, Role>();
+
+		for (const participant of snapshot.participants) {
+			if (participant.roleId === null) continue;
+
+			const role = rolesById.get(participant.roleId);
+			if (!role) continue;
+
+			rolesByPlayerId.set(participant.playerId, role);
+		}
+
+		if (rolesByPlayerId.size !== snapshot.participants.length) {
+			return false;
+		}
+
+		const players = new Map<number, LobbyPlayer>();
+		for (const participant of snapshot.participants) {
+			players.set(participant.playerId, {
+				playerId: participant.playerId,
+				type: participant.type,
+				username: participant.username,
+				iconEtag: participant.iconEtag,
+				isReady: true,
+				isOnline: participant.type === "bot" || participant.playerId === playerId,
+				seatNr: participant.seatNr
+			});
+		}
+
+		const userSocketCounts = new Map<number, number>();
+		userSocketCounts.set(playerId, 1);
+
+		const lobby: LobbySession = {
+			gameCode: snapshot.game.gameCode,
+			sockets: new Set([ws]),
+			players,
+			userSocketCounts,
+			metaSettings: {
+				maxPlayers: snapshot.game.maxPlayers,
+				minPlayers: snapshot.game.minPlayers,
+				daySeconds: snapshot.game.daySeconds,
+				votingSeconds: snapshot.game.votingSeconds,
+				nightSeconds: snapshot.game.nightSeconds,
+				tieBehavior: snapshot.game.tieBehavior,
+				voteCountVisibility: snapshot.game.voteCountVisibility,
+				anonymousVoting: snapshot.game.anonymousVoting,
+				roleRevealOnDeath: snapshot.game.roleRevealOnDeath,
+				roleDistributionMode: snapshot.game.roleDistributionMode
+			},
+			roleSettings: snapshot.roleSettings as RoleSettings,
+			botSettings: snapshot.botSettings as BotSettings,
+			status: "starting",
+			createdAt: snapshot.game.createdAt.getTime(),
+			lastActiveAt: Date.now()
+		};
+
+		ws.game = { id: snapshot.game.id, code: snapshot.game.gameCode };
+
+		this.gameSessions.createFromLobby(gameId, lobby, rolesByPlayerId);
+		this.gameSessions.startPhaseTimer(gameId, snapshot.game.phase ?? "day");
+
+		return true;
 	}
 
 	public async handleMessage(ws: ConnectedUserSocket, msg: ClientMessage): Promise<void> {
@@ -199,8 +316,22 @@ export class WSGameHandler {
 		const gameId = ws.game?.id;
 		if (!gameId) throw new AppError(ErrorCode.GAME_NOT_IN_LOBBY);
 
-		const state = this.lobbySessions.getLobbyState(gameId);
-		if (!state) throw new AppError(ErrorCode.GAME_NOT_IN_LOBBY);
+		// If no lobby state, fetch it
+		let state = this.lobbySessions.getLobbyState(gameId);
+		if (!state) {
+			if (await this.ensureLobbySession(gameId)) {
+				state = this.lobbySessions.getLobbyState(gameId);
+			}
+		}
+		if (!state) {
+			if (await this.ensureInGameSession(ws, gameId)) {
+				this.sendMessage(ws, { type: "GAME_STARTED", gameId, gameCode: ws.game?.code ?? "" });
+				await this.onRequestGameState(ws);
+				return;
+			}
+
+			throw new AppError(ErrorCode.GAME_NOT_IN_LOBBY);
+		}
 
 		this.sendMessage(ws, { type: "LOBBY_STATE", data: { ...state, gameCode: ws.game?.code ?? "" } });
 	}
@@ -368,6 +499,17 @@ export class WSGameHandler {
 					rolesByPlayerId.set(participant.playerId, role);
 				}
 
+				if (rolesByPlayerId.size !== lobby.players.size) {
+					const snapshot = await GameService.getInProgressGameSnapshot(gameId);
+					for (const participant of snapshot?.participants ?? []) {
+						if (participant.roleId === null) continue;
+
+						const role = rolesById.get(participant.roleId);
+						if (!role) continue;
+
+						rolesByPlayerId.set(participant.playerId, role);
+					}
+				}
 				this.gameSessions.createFromLobby(gameId, lobby, rolesByPlayerId);
 
 				// Get only possibly existing roles
@@ -406,7 +548,12 @@ export class WSGameHandler {
 		if (!playerId) throw new AppError(ErrorCode.UNAUTHORIZED);
 		if (!gameId) throw new AppError(ErrorCode.GAME_NOT_FOUND);
 
-		const gameState = this.gameSessions.getGameState(gameId, playerId);
+		// If no game session, fetch it
+		let gameState = this.gameSessions.getGameState(gameId, playerId);
+		if (!gameState && await this.ensureInGameSession(ws, gameId)) {
+			gameState = this.gameSessions.getGameState(gameId, playerId);
+		}
+
 		if (!gameState) throw new AppError(ErrorCode.GAME_NOT_FOUND);
 
 		this.sendMessage(ws, { type: "GAME_STATE", data: { ...gameState, gameCode: ws.game?.code ?? gameState.gameCode } });
@@ -561,7 +708,7 @@ export class WSGameHandler {
 
 		if (current.status === "in_progress") {
 			await this.gameLocks.run(current.id, async () => {
-				if (!this.gameSessions.joinSession(ws, current.id, playerId)) {
+				if (!this.gameSessions.joinSession(ws, current.id, playerId) && !(await this.ensureInGameSession(ws, current.id))) {
 					this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 					return;
 				}
@@ -572,6 +719,10 @@ export class WSGameHandler {
 			});
 		} else {
 			await this.lobbyLocks.run(current.id, async () => {
+				if (!this.lobbySessions.joinSession(ws, current.id, playerId)) {
+					await this.ensureLobbySession(current.id);
+				}
+
 				if (!this.lobbySessions.joinSession(ws, current.id, playerId)) {
 					this.sendMessage(ws, { type: "RECOVER_GAME_NONE" });
 					return;

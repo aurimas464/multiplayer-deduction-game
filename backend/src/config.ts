@@ -11,6 +11,10 @@ if (!databaseUrl) {
 
 const url = new URL(databaseUrl);
 
+const defaultDatabaseSsl = process.env.NODE_ENV === "production" || Boolean(process.env.WEBSITE_INSTANCE_ID);
+const databaseSslEnv = process.env.DATABASE_SSL ?? url.searchParams.get("ssl");
+const databaseSsl = databaseSslEnv === "true" ? true : databaseSslEnv === "false" ? false : defaultDatabaseSsl;
+
 const config: AppConfig = {
 	baseUrl: process.env.BASE_URL || "http://localhost",
 	port: parseInt(process.env.PORT || "", 10),
@@ -29,6 +33,7 @@ const config: AppConfig = {
 		user: decodeURIComponent(url.username),
 		password: decodeURIComponent(url.password),
 		database: url.pathname.replace(/^\//, ""),
+		ssl: databaseSsl,
 	},
 };
 

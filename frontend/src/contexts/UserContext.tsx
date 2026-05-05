@@ -24,12 +24,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
 		try {
 			const parsedUser = JSON.parse(storedUser);
+			const theme = typeof parsedUser.theme === "number"
+				? themes[parsedUser.theme]
+				: parsedUser.theme;
+			const colorTheme = typeof parsedUser.colorTheme === "number"
+				? colorThemes[parsedUser.colorTheme]
+				: parsedUser.colorTheme;
+			const language = typeof parsedUser.language === "number"
+				? languages[parsedUser.language]
+				: parsedUser.language;
 
 			return {
 				...parsedUser,
-				theme: themes[parsedUser.theme] ?? themes[0],
-				colorTheme: colorThemes[parsedUser.colorTheme] ?? colorThemes[0],
-				language: languages[parsedUser.language] ?? languages[0],
+				theme: themes.includes(theme) ? theme : themes[0],
+				colorTheme: colorThemes.includes(colorTheme) ? colorTheme : colorThemes[0],
+				language: languages.includes(language) ? language : languages[0],
 			} as User;
 		} catch {
 			return null;
@@ -53,19 +62,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 			return;
 		}
 
-		const themeIdx = themes.indexOf(user.theme);
-		const colorIdx = colorThemes.indexOf(user.colorTheme);
-		const langIdx = languages.indexOf(user.language);
-
-		localStorage.setItem(
-			"user",
-			JSON.stringify({
-				...user,
-				theme: themeIdx === -1 ? 0 : themeIdx,
-				colorTheme: colorIdx === -1 ? 0 : colorIdx,
-				language: langIdx === -1 ? 0 : langIdx,
-			})
-		);
+		localStorage.setItem("user", JSON.stringify(user));
 	}, [user]);
 
 	//On mount
@@ -98,14 +95,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 						return;
 					}
 
-					const parsedUser: User = userData.result;
-
-					setUser({
-						...parsedUser,
-						theme: parsedUser.theme,
-						colorTheme: parsedUser.colorTheme,
-						language: parsedUser.language,
-					} as User);
+					setUser(userData.result);
 				}
 			} catch {
 				if (!isMounted) return;

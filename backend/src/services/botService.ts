@@ -311,8 +311,9 @@ type BotRuleBookMemory = Omit<typeof BOT_RULE_BOOK, "roles"> & {
 };
 
 class BotService {
-	private readonly llamaApiUrl = process.env.OLLAMA_BASE_URL?.trim() || "http://localhost:11434/api/chat";
+	private readonly llamaApiUrl = this.normalizeOllamaChatUrl(process.env.OLLAMA_BASE_URL?.trim() || "http://localhost:11434");
 	private readonly llamaModel = process.env.OLLAMA_CHAT_MODEL?.trim() || "qwen2.5:4b";
+	private readonly llamaApiKey = process.env.OLLAMA_API_KEY?.trim() || "";
 	private readonly minimumRemainingRequestMs = 5_000;
 
 	private activeBotRequests = 0;
@@ -822,9 +823,14 @@ class BotService {
 
 			try {
 				// Send request to Ollama
+				const headers: Record<string, string> = { "Content-Type": "application/json" };
+				if (this.llamaApiKey) {
+					headers.Authorization = `Bearer ${this.llamaApiKey}`;
+				}
+
 				const response = await fetch(this.llamaApiUrl, {
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers,
 					signal: controller.signal,
 					body: JSON.stringify({
 						model: this.llamaModel,
@@ -896,6 +902,11 @@ class BotService {
 		memory.decisionHistory = decisionHistory.slice(-MAX_DECISION_HISTORY_ENTRIES);
 
 		await GameBotSetupModel.changeMemoryJson(gameId, playerId, memory);
+	}
+
+	private normalizeOllamaChatUrl(url: string): string {
+		const cleanUrl = url.replace(/\/+$/, "");
+		return cleanUrl.endsWith("/api/chat") ? cleanUrl : `${cleanUrl}/api/chat`;
 	}
 
 	private createProfile(difficulty: FinalBotDifficulty, playstyle: FinalBotPlaystyle, role: Role | null): BotProfile {

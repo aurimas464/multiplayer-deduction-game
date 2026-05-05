@@ -12,6 +12,7 @@ export type DatabaseConfig = {
 	user: string;
 	password: string;
 	database: string;
+	ssl: boolean;
 }
 
 export type AppConfig = {

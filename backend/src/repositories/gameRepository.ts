@@ -1,8 +1,9 @@
 import prisma from "../../prisma/client";
 import type { Prisma, Game as GamePrisma } from "@prisma/client";
-import type { GameStatus, Game, CreateGame, PatchGame, GameChatMessageItem } from "../types/entities/game";
+import type { GameStatus, Game, CreateGame, PatchGame, GameChatMessageItem, GameSessionSnapshot, GameSessionSnapshotParticipant } from "../types/entities/game";
 import type { RoleAlignment } from "../types/entities/role";
 import { type Pagination } from "../types/index";
+import type { PlayerType } from "../types/entities/player";
 
 class Model {
 	constructor(private readonly db: Prisma.TransactionClient | typeof prisma) {}
@@ -72,6 +73,65 @@ class Model {
 		});
 
 		return row ? this.mapGame(row) : null;
+	}
+
+	async findSessionSnapshot(gameId: number): Promise<GameSessionSnapshot | null> {
+		const row = await this.db.game.findUnique({
+			where: { id: gameId },
+			include: {
+				gameRoleSetup: true,
+				gameBotSetup: true,
+				participants: {
+					orderBy: { seatNr: "asc" },
+					include: {
+						player: {
+							include: {
+								user: { include: { user: true } },
+								bot: { include: { bot: true } }
+							}
+						}
+					}
+				}
+			}
+		});
+
+		if (!row) return null;
+
+		const participants = row.participants.map((participant): GameSessionSnapshotParticipant => {
+			const type = participant.player.type as PlayerType;
+			const username = type === "bot"
+				? (participant.player.bot?.bot.name ?? `Bot ${participant.playerId}`)
+				: (participant.player.user?.user.username ?? `Player ${participant.playerId}`);
+
+			return {
+				gameId: participant.gameId,
+				playerId: participant.playerId,
+				roleId: participant.roleId,
+				seatNr: participant.seatNr,
+				didWin: participant.didWin,
+				isAlive: participant.isAlive,
+				createdAt: participant.createdAt,
+				updatedAt: participant.updatedAt,
+				username,
+				iconEtag: participant.player.iconEtag ?? "",
+				type
+			};
+		});
+
+		const roleSettings: Record<number, number> = {};
+		for (const setup of row.gameRoleSetup) {
+			roleSettings[setup.roleId] = setup.count;
+		}
+
+		const botSettings: GameSessionSnapshot["botSettings"] = {};
+		for (const setup of row.gameBotSetup) {
+			botSettings[setup.playerId] = {
+				difficulty: setup.difficulty,
+				playstyle: setup.playstyle
+			};
+		}
+
+		return { game: this.mapGame(row), participants, roleSettings, botSettings };
 	}
 
 	async changeStatus(gameId: number, status: GameStatus): Promise<void> {

@@ -3,6 +3,9 @@ import { gameChatMessageSchema } from "./gameChatMessage";
 import { responseUserSchema } from "./user";
 import { responseBotSchema } from "./bot";
 import { roleAlignment } from "./role";
+import type { Participant } from "./participant";
+import type { PlayerType } from "./player";
+import type { BotDifficulty, BotPlaystyle } from "./gameBotSetup";
 
 export const gameStatus = ["lobby", "starting", "in_progress", "finished", "cancelled"] as const;
 export type GameStatus = (typeof gameStatus)[number];
@@ -107,3 +110,16 @@ export type CreateGame = z.infer<typeof createGameSchema>;
 export type PatchGame = z.infer<typeof patchGameSchema>;
 
 export type GameChatMessageItem = z.infer<typeof gameChatMessageItemSchema>;
+
+export type GameSessionSnapshotParticipant = Participant & {
+	username: string;
+	iconEtag: string;
+	type: PlayerType;
+};
+
+export type GameSessionSnapshot = {
+	game: Game;
+	participants: GameSessionSnapshotParticipant[];
+	roleSettings: Record<number, number>;
+	botSettings: Record<number, { difficulty: BotDifficulty; playstyle: BotPlaystyle }>;
+};
