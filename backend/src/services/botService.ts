@@ -6,59 +6,46 @@ import type { CreateGameChatMessage, ResponseGameChatMessage } from "../types/en
 import type { Role } from "../types/entities/role";
 import type { LobbyPlayer, BotSettings } from "../types/websocket/types";
 import type { GameStatePlayer, PersonalPhaseResult, PhaseResult, PlayerAction, PlayerActionType, BotNightActionState } from "../types/websocket/types";
-import { botDifficultyKeys, botPlaystyleKeys, BotJsonOptions } from "../types/bot";
-import type { BotActionChoice, BotChoiceResult, BotDecisionHistoryEntry, BotGameMemory, BotMemoryPlayer, BotPhaseHistoryEntry, BotProfile, BotProfilePatch, BotRoleMemory, FinalBotDifficulty, FinalBotPlaystyle, RecentChatMemoryEntry, ReservedDiscussionMessages } from "../types/bot";
+import { botDifficultyKeys, botPlaystyleKeys, botRateLevels, botRiskLevels } from "../types/bot";
+import type { BotActionChoice, BotActionPlan, BotChoiceResult, BotDecisionHistoryEntry, BotDiscussionPlanContext, BotDiscussionPlans, BotGameMemory, BotJsonOptions, BotMemoryPlayer, BotPhaseHistoryEntry, BotProfile, BotProfilePatch, BotRoleMemory, FinalBotDifficulty, FinalBotPlaystyle, RateLevel, RecentChatMemoryEntry, ReservedDiscussionMessages, RiskLevel } from "../types/bot";
 import type { Bot } from "../types/entities/bot";
 
+// Compact rule book
 const BOT_RULE_BOOK = {
-	game: {
-		summary: "Hidden-role gothic deduction game with commune, vampire, and neutral roles.",
-		phaseOrder: ["day", "voting", "night"],
-		firstDayRule: "The first day skips voting and goes directly to night, so do not discuss voting on day one."
+	action: {
+		timeLimitInstruction: "Only respond if enough time remains. If unsure, return skip quickly.",
+		voting: [
+			"Vote only when evidence or win condition supports it.",
+			"Before voting, consider your own role, alignment, and win condition.",
+			"Self-vote can be useful for roles that want to be eliminated by vote, but harmful for roles that need to survive.",
+			"Use contradictions, claims, votes, eliminations, and your private results.",
+			"If evidence is weak, skip. Do not invent reasons."
+		],
+		night: [
+			"Choose only a legal action for your role.",
+			"Target living valid non-self players; avoid known vampire allies unless survival requires it.",
+			"Use role, win condition, suspicion, claims, eliminations, and previous results.",
+			"If no useful legal action exists, skip."
+		]
 	},
-	knowledge: {
-		allowed: ["own role", "own alignment", "available role keys", "public chat", "public votes if visible", "public eliminations", "own private results", "known vampire allies if vampire"],
-		forbidden: ["private results of other players", "server-only state", "roles not available in this game", "invented claims", "invented night results", "invented votes"],
-		evidence: ["contradictions", "claim conflicts", "voting behavior", "public eliminations", "own private role results"],
-		accusationRule: "Do not accuse without evidence. Do not accuse only because someone is quiet, talkative, or because it is day one.",
-		roleInfoRule: "Claim or hint your role only when it gives strategic value: explaining a result, countering a false claim, surviving pressure, or advancing your win condition."
+	discussion: {
+		timeLimitInstruction: "Only respond if enough time remains, keep the message short.",
+		antiRepeatInstruction: "Do not copy these lines. Keep the same meaning only when useful, but use different wording and current game context.",
+		mustRead: [
+			"Speak like a casual player in a lightly Gotham-themed deduction game, not a helper or narrator.",
+			"Keep it short, grounded, and about the game.",
+			"First day is light chat only: greet, ask a simple table question, or say there is no evidence yet.",
+			"Answer direct questions when they are aimed at you.",
+			"Use your own findings from personalResult when useful, but do not invent visits, claims, or night activity.",
+			"Silence, low activity, vibe, shadows, or imagined private conversations are not evidence.",
+			"Claim your role only when it creates strategic value."
+		],
+		goals: {
+			firstDay: "Light first-day table chat only and greetings. No suspect names, no pressure, no accusations. Your goal, bring variety to the table.",
+			voting: "Use voting discussion to act on available evidence. If public results, vote history, direct contradictions, recentClaims, or memory.recentFindings point to a player, name that player and explain the reason. Only say skipping is cleaner when none of those sources gives a usable reason.",
+			regular: "Answer questions first. If someone made an action claim, ask for target/result details. If memory.recentFindings has entries, share the useful part if it benefits you and your side. If not, say you have nothing solid or use harmless chatter when chatterPlan allows it."
+		}
 	},
-	mustReadBeforeDiscussion: [
-		"Speak like a casual player in a lightly Gotham-themed deduction game, not a helper or narrator.",
-		"Keep it short, grounded, and about the game.",
-		"First day is light chat only: greet, ask a simple table question, or say there is no evidence yet.",
-		"Answer direct questions when they are aimed at you.",
-		"Use your own findings from personalResult when useful, but do not invent visits, claims, or night activity.",
-		"Silence, low activity, vibe, shadows, or imagined private conversations are not evidence.",
-		"Claim your role only when it creates strategic value."
-	],
-	mustReadBeforeVoting: [
-		"Vote only when evidence or win condition supports it.",
-		"Before voting, consider your own role, alignment, and win condition.",
-		"Self-vote can be useful for roles that want to be eliminated by vote, but harmful for roles that need to survive.",
-		"Use contradictions, claims, votes, eliminations, and your private results.",
-		"If evidence is weak, skip. Do not invent reasons."
-	],
-	mustReadBeforeNightAction: [
-		"Choose only a legal action for your role.",
-		"Target living valid non-self players; avoid known vampire allies unless survival requires it.",
-		"Use role, win condition, suspicion, claims, eliminations, and previous results.",
-		"If no useful legal action exists, skip."
-	],
-	phases: {
-		day: "Discuss, question claims, pressure suspicious players only with evidence, defend yourself, and build cases.",
-		voting: "Vote for a living player or skip. Avoid random votes.",
-		night: "Special role actions resolve secretly."
-	},
-	votingGuide: {
-		lookFor: ["contradictions", "suspicious claims", "harmful vote behavior", "public elimination results", "own role results"],
-		avoid: ["random votes", "eliminated players", "votes based only on activity level", "invented evidence"]
-	},
-	nightActionGuide: {
-		lookFor: ["targets useful to your win condition", "trusted players", "suspicious players", "dangerous claims", "players likely to expose you", "previous results"],
-		avoid: ["self targets", "eliminated players", "illegal actions", "random kills", "harmful actions on allies unless necessary"]
-	},
-	nightResolutionOrder: ["visits", "protection", "jail", "information", "elimination", "conversion", "vampire hunger", "starvation", "priest feedback", "chronicler assignment"],
 	winConditions: {
 		commune: "Commune wins when no living vampires remain.",
 		vampire: "Vampires win when living vampires are equal to or greater than living non-vampires.",
@@ -66,223 +53,194 @@ const BOT_RULE_BOOK = {
 		serialKiller: "Serial Killer wins after personally eliminating at least half of all players.",
 		chronicler: "Chronicler wins after correctly guessing at least one quarter of all player roles."
 	},
-	mechanics: {
-		skip: "No special action is performed.",
-		eliminate: "Eliminate targets one living non-self player. Protection can block this action.",
-		convert: "Convert targets one living non-vampire player and changes them into a vampire. Count can use this once per game.",
-		inspect: "Inspect targets one living non-self player and returns good if commune, or bad if vampire or neutral.",
-		watch: "Watch targets one living non-self player and returns which players targeted that player during the night.",
-		jail: "Jail targets one living non-self player and prevents them from submitting actions while jailed.",
-		protect: "Protect targets one living non-self player and blocks elimination against that target during the night.",
-		guess: "Guess targets one living non-self player and checks whether they have the Chronicler's assigned role key.",
-		vampireHunger: "Each vampire tracks its own missed successful eliminations.",
-		bloodbank: "If BloodBank is alive, vampire starvation limit increases from three to five missed cycles.",
-		vigilantePenalty: "Vigilante dies if they eliminate a commune player.",
-		roleReveal: "Eliminated player roles may or may not be public depending on game settings."
-	},
 	roles: {
 		vampire: {
-		description: "Vampire-aligned killer. Can eliminate every second night.",
-		nightActions: ["eliminate"],
-		strategyHints: [
-			"Redirect suspicion away from vampires.",
-			"Target trusted commune players or information roles.",
-			"Avoid looking coordinated with vampire allies.",
-		]},
+			description: "Vampire-aligned killer. Can eliminate every second night.",
+			nightActions: ["eliminate"],
+			strategyHints: [
+				"Redirect suspicion away from vampires.",
+				"Target trusted commune players or information roles.",
+				"Avoid looking coordinated with vampire allies."
+			]
+		},
 		bloodBank: {
-		description: "Vampire-aligned support killer. Extends vampire starvation tolerance while alive.",
-		nightActions: ["eliminate"],
-		strategyHints: [
-			"Stay alive because your existence helps vampires.",
-			"Play less recklessly than regular vampires.",
-			"Target players likely to expose vampires.",
-		]},
+			description: "Vampire-aligned support killer. Extends vampire starvation tolerance while alive.",
+			nightActions: ["eliminate"],
+			strategyHints: [
+				"Stay alive because your existence helps vampires.",
+				"Play less recklessly than regular vampires.",
+				"Target players likely to expose vampires."
+			]
+		},
 		count: {
-		description: "Powerful vampire role. Can eliminate and can convert one target once per game.",
-		nightActions: ["eliminate", "convert"],
-		strategyHints: [
-			"Use conversion on a valuable player likely to survive.",
-			"Do not waste conversion on someone likely to be voted out.",
-			"Protect vampire allies through discussion.",
-		]},
+			description: "Powerful vampire role. Can eliminate and can convert one target once per game.",
+			nightActions: ["eliminate", "convert"],
+			strategyHints: [
+				"Use conversion on a valuable player likely to survive.",
+				"Do not waste conversion on someone likely to be voted out.",
+				"Protect vampire allies through discussion."
+			]
+		},
 		commoner: {
-		description: "Commune role with no night action. Relies on discussion and voting.",
-		nightActions: ["skip"],
-		strategyHints: [
-			"Focus on voting behavior and contradictions.",
-			"Pressure suspicious claims only when there is a reason.",
-			"Do not pretend to have night results.",
-		]},
+			description: "Commune role with no night action. Relies on discussion and voting.",
+			nightActions: ["skip"],
+			strategyHints: [
+				"Focus on voting patterns and contradictions.",
+				"Pressure suspicious claims only when there is a reason.",
+				"Do not pretend to have night results."
+			]
+		},
 		visionary: {
-		description: "Commune information role. Learns whether a target is good or bad.",
-		nightActions: ["inspect"],
-		strategyHints: [
-			"Inspect suspicious or influential players.",
-			"Reveal results only when useful.",
-			"Remember bad can mean vampire or neutral.",
-		]},
+			description: "Commune information role. Learns whether a target is good or bad.",
+			nightActions: ["inspect"],
+			strategyHints: [
+				"Inspect suspicious or influential players.",
+				"Reveal results only when useful.",
+				"Remember bad can mean vampire or neutral."
+			]
+		},
 		vigilante: {
-		description: "Commune killing role. Dies if they eliminate a commune player.",
-		nightActions: ["eliminate"],
-		strategyHints: [
-			"Shoot only when suspicion is strong.",
-			"Do not kill on the first night unless there is unusually strong public evidence.",
-			"Prioritize likely vampires.",
-		]},
+			description: "Commune killing role. Dies if they eliminate a commune player.",
+			nightActions: ["eliminate"],
+			strategyHints: [
+				"Be careful with low-information kills because wrong eliminations can punish you.",
+				"Use private findings, claim conflicts, or strong table contradictions when choosing a target.",
+				"Prioritize likely vampires."
+			]
+		},
 		watchman: {
-		description: "Commune information role. Sees who visited the chosen target.",
-		nightActions: ["watch"],
-		strategyHints: [
-			"Watch trusted or likely attacked players.",
-			"Use visitor results to pressure suspicious players.",
-			"Consider who had reason to visit the target; if the target is dead, that may point toward vampire activity.",
-		]},
+			description: "Commune information role. Sees who visited the chosen target.",
+			nightActions: ["watch"],
+			strategyHints: [
+				"Watch trusted or likely attacked players.",
+				"Use visitor results to pressure suspicious players.",
+				"Consider who had reason to visit the target; if the target is dead, that may point toward vampire activity."
+			]
+		},
 		jailor: {
-		description: "Commune control role. Jails one player, blocking their next action cycle.",
-		nightActions: ["jail"],
-		strategyHints: [
-			"Jail suspicious players.",
-			"Use jail to test if night pressure stops.",
-			"Do not repeatedly jail obvious commune players.",
-		]},
+			description: "Commune control role. Jails one player, blocking their next action cycle.",
+			nightActions: ["jail"],
+			strategyHints: [
+				"Jail suspicious players.",
+				"Use jail to test if night pressure stops.",
+				"Do not repeatedly jail obvious commune players."
+			]
+		},
 		priest: {
-		description: "Commune protection role. Protects one target from elimination.",
-		nightActions: ["protect"],
-		strategyHints: [
-			"Protect likely valuable commune players.",
-			"Use attack feedback as evidence.",
-			"Avoid predictable protection.",
-		]},
+			description: "Commune protection role. Protects one target from elimination.",
+			nightActions: ["protect"],
+			strategyHints: [
+				"Protect likely valuable commune players.",
+				"Use attack feedback as evidence.",
+				"Avoid predictable protection."
+			]
+		},
 		jester: {
-		description: "Neutral role. Wins by being eliminated during voting.",
-		nightActions: ["skip"],
-		strategyHints: [
-			"Look suspicious but not obviously like Jester.",
-			"Encourage votes on yourself indirectly.",
-			"Avoid being killed at night.",
-		]},
+			description: "Neutral role. Wins by being eliminated during voting.",
+			nightActions: ["skip"],
+			strategyHints: [
+				"Look suspicious but not obviously like Jester.",
+				"Encourage votes on yourself indirectly.",
+				"Avoid being killed at night."
+			]
+		},
 		serialKiller: {
-		description: "Neutral killer. Can eliminate every night and wins by reaching the kill requirement.",
-		nightActions: ["eliminate"],
-		strategyHints: [
-			"Blend in as commune.",
-			"Remove players who threaten your survival.",
-			"Do not let vampires win too quickly.",
-		]},
+			description: "Neutral killer. Can eliminate every night and wins by reaching the kill requirement.",
+			nightActions: ["eliminate"],
+			strategyHints: [
+				"Blend in as commune.",
+				"Remove players who threaten your survival.",
+				"Do not let vampires win too quickly."
+			]
+		},
 		chronicler: {
-		description: "Neutral guessing role. Receives a role key and guesses which player has it.",
-		nightActions: ["guess"],
-		strategyHints: [
-			"Track claims and behavior.",
-			"Ask questions to identify assigned roles.",
-			"Only guess among roles that exist in this game.",
-		]}
+			description: "Neutral guessing role. Receives a role key and guesses which player has it.",
+			nightActions: ["guess"],
+			strategyHints: [
+				"Track claims and voting patterns.",
+				"Ask questions to identify assigned roles.",
+				"Only guess among roles that exist in this game."
+			]
+		}
 	}
 } as const;
 
 const DEFAULT_BOT_PROFILE = {
 	talkStyle: { confidence: "medium", accusationRate: "medium", claimRate: "low", deceptionRate: "low", questionRate: "medium" },
-	actionStyle: { voteRisk: "balanced", nightRisk: "balanced", targetPriority: ["players with contradictions"] },
-	behavior: ["Act like a grounded player in a Gotham-like deduction game.", "Use only known information.", "Keep messages short and game-relevant."],
-	strategyHints: [] as string[]
+	actionStyle: { voteRisk: "balanced", nightRisk: "balanced", targetPriority: ["players with contradictions"] }
 } as const;
 
+// Difficulty changes
 const BOT_DIFFICULTY_PATCHES: Record<FinalBotDifficulty, BotProfilePatch> = {
 	easy: {
 		talkStyle: { confidence: "low", accusationRate: "low", claimRate: "low", questionRate: "medium" },
-		actionStyle: { voteRisk: "safe", nightRisk: "safe" },
-		behavior: ["Make simple arguments.", "Occasionally miss subtle connections.", "Do not over-optimize decisions."]
+		actionStyle: { voteRisk: "safe", nightRisk: "safe" }
 	},
-	normal: {
-		behavior: ["Play reasonably.", "Notice obvious contradictions.", "Do not solve everything perfectly."]
-	},
+	normal: {},
 	hard: {
-		talkStyle: { confidence: "high", accusationRate: "high", questionRate: "high" },
-		behavior: ["Track claims, voting patterns, contradictions, and likely team connections.", "Use previous statements when applying pressure.", "Adapt strategy when new public information appears."]
+		talkStyle: { confidence: "high", accusationRate: "high", questionRate: "high" }
 	}
 };
 
+// Playstyles
 const BOT_PLAYSTYLE_PATCHES: Record<FinalBotPlaystyle, BotProfilePatch> = {
-	balanced: {
-		behavior: ["Balance pressure, defense, questioning, and cooperation."]
-	},
+	balanced: {},
 	aggressive: {
 		talkStyle: { confidence: "high", accusationRate: "high", questionRate: "medium" },
-		actionStyle: { voteRisk: "risky", nightRisk: "risky" },
-		behavior: ["Push suspicions early when evidence exists.", "Try to control the vote direction.", "Challenge weak claims directly."]
+		actionStyle: { voteRisk: "risky", nightRisk: "risky" }
 	},
 	passive: {
 		talkStyle: { confidence: "low", accusationRate: "low", claimRate: "low", questionRate: "medium" },
-		actionStyle: { voteRisk: "safe", nightRisk: "safe" },
-		behavior: ["Speak less often.", "Avoid leading votes unless evidence is strong.", "Prefer agreeing, soft suspicion, and simple questions."]
+		actionStyle: { voteRisk: "safe", nightRisk: "safe" }
 	},
 	deceptive: {
 		talkStyle: { confidence: "medium", accusationRate: "medium", claimRate: "medium", deceptionRate: "high", questionRate: "medium" },
-		actionStyle: { voteRisk: "balanced", nightRisk: "risky" },
-		behavior: ["Use misleading but plausible arguments when it helps your win condition.", "Do not contradict known public facts.", "Create believable alternative explanations."]
+		actionStyle: { voteRisk: "balanced", nightRisk: "risky" }
 	},
 	defensive: {
 		talkStyle: { confidence: "medium", accusationRate: "low", claimRate: "medium", questionRate: "high" },
-		actionStyle: { voteRisk: "safe", nightRisk: "balanced" },
-		behavior: ["Prioritize self-preservation.", "Deflect suspicion carefully.", "Ask others to explain their accusations."]
+		actionStyle: { voteRisk: "safe", nightRisk: "balanced" }
 	},
 	chaotic: {
 		talkStyle: { confidence: "medium", accusationRate: "high", claimRate: "medium", deceptionRate: "high" },
-		actionStyle: { voteRisk: "risky", nightRisk: "risky" },
-		behavior: ["Create uncertainty.", "Change pressure often, but stay believable.", "Avoid becoming obviously random."]
+		actionStyle: { voteRisk: "risky", nightRisk: "risky" }
 	}
 };
 
+// Alignment affects target priorities, while legal actions are still checked later by the game state
 const BOT_ALIGNMENT_PATCHES: Record<string, BotProfilePatch> = {
 	commune: {
-		actionStyle: { targetPriority: ["players defending vampires", "players avoiding useful votes", "players making fake-looking claims"] },
-		behavior: ["Help commune identify and eliminate vampires. Share role findings when useful, but remember that doing so can make you a target."]
+		actionStyle: { targetPriority: ["players defending vampires", "players avoiding useful votes", "players making fake-looking claims"] }
 	},
 	vampire: {
-		actionStyle: { targetPriority: ["confirmed or trusted commune players", "information roles", "protection roles", "players suspecting vampires"] },
-		behavior: ["Protect vampire allies, redirect suspicion without obvious coordination, and pretend to be a normal player."]
+		actionStyle: { targetPriority: ["confirmed or trusted commune players", "information roles", "protection roles", "players suspecting vampires"] }
 	},
 	neutral: {
-		actionStyle: { targetPriority: ["players blocking your personal win condition", "players who are too trusted", "players likely to expose you"] },
-		behavior: ["Prioritize your personal win condition over faction loyalty."]
+		actionStyle: { targetPriority: ["players blocking your personal win condition", "players who are too trusted", "players likely to expose you"] }
 	}
 };
 
+// Action prompts use numbered choices so the model cannot invent action names or hidden identifiers
 const BOT_ACTION_SYSTEM_MESSAGE = [
 	"Return exactly one JSON object with only keys choiceIndex, targetIndex, reason.",
-	"Choose by numeric choiceIndex from availableActions.",
-	"Choose targets by numeric targetIndex from targets.",
-	"Do not return action type names, role names, phase names, player ids, memory, context, rules, players, recentChat, or requiredOutput.",
-	"If the choice requires a target, targetIndex must be one of targets[].targetIndex.",
-	"If the choice does not require a target, targetIndex must be null.",
-	"If unsure, choose skip."
+	"Use numeric choiceIndex from availableActions and numeric targetIndex from targets; use null when no target is required.",
+	"Choose using actionPlan, memory.rules, memory.recentFindings, memory.phaseHistory, memory.decisionHistory, recentChat, and the current phase.",
+	"Use only known information from memory and payload. If unsure, choose skip."
 ].join(" ");
 
+// Discussion prompts have style and safety instructions
 const BOT_DISCUSSION_SYSTEM_MESSAGE = [
 	"Return exactly one JSON object with only keys message and reason.",
-	"You are speaking in a lightly Gotham-themed hidden-role deduction game.",
-	"Write one short game chat message.",
-	"Sound casual and table-focused; a small hint of dark-city mood is enough.",
-	"No poetic shadow/secret lines, no monologues, no real-life small talk, no strategy-guide phrasing.",
-	"Do not start with Name:, Message:, or your own name followed by a colon.",
-	"On day one, do not accuse, pressure, or name a suspect.",
-	"Never treat quietness, vibes, being watched, shadows, or imagined conversations as evidence.",
-	"Only suspect someone when public results, vote history, direct contradictions, or your own personal findings support it.",
-	"If discussionState.deceptionPlan.shouldDeceive is true, you should usually use one deceptive tactic in this message.",
-	"Allowed deceptive tactics: a misleading suspicion framing, strategic omission, or a plausible false role hint/claim.",
-	"Do not fabricate concrete public mechanics (vote totals, eliminations, revealed roles, or system messages).",
-	"If someone claims they eliminated, converted, jailed, protected, inspected, watched, or guessed, ask a short follow-up unless you have more important findings.",
-	"If someone asks you a question, answer it directly when you can.",
-	"Use your own concrete findings from memory.recentFindings when they are useful, but not every message needs to reveal or discuss information.",
-	"If discussionState.chatterPlan.shouldChatter is true and there is no urgent question or claim to answer, you may write harmless table chatter instead of discussing findings.",
-	"Harmless chatter can be a brief greeting, uncertainty, checking in with the table, or light gothic mood; it must not accuse, reveal, or invent game facts.",
-	"Read discussionState.antiRepeat before writing. Do not reuse exact or near-exact wording from those messages.",
-	"If you need to repeat the same game idea, change the sentence structure and add current context.",
-	"If memory.recentFindings is empty, either say you have nothing solid or use harmless chatter when chatterPlan allows it.",
-	"Do not invent night visits, public actions, claims, or evidence.",
-	"Do not pressure someone only because they were quiet.",
-	"Day one can be a brief greeting or cautious table-read posture.",
-	"Claim or hint your role only when it creates strategic value."
+	"Write one short in-game chat message as this bot, following memory.rules and discussionState.",
+	"Use memory.recentFindings, memory.phaseHistory, memory.decisionHistory, recentChat, recentQuestions, and recentClaims when relevant.",
+	"Use only known facts or private findings; do not invent actions, visits, claims, evidence, vote totals, eliminations, or role reveals.",
+	"Keep day one light: no suspect names, pressure, or accusations.",
+	"During voting, do not say there is no evidence if memory.recentFindings, recentClaims, vote history, or public results give a usable reason.",
+	"When accusing or pressuring a player, mention that player's name and tie it to known evidence.",
+	"Do not write vague accusations like someone, people, or this table.",
+	"Answer direct questions or action claims when useful; otherwise follow discussionState.goal.",
+	"Do not repeat lines listed in discussionState.antiRepeat, and do not start with a name label.",
+	"Keep the light Gotham mood subtle and table-focused."
 ].join(" ");
 
 const MAX_PHASE_HISTORY_ENTRIES = 10;
@@ -293,6 +251,7 @@ const MAX_RESERVED_DISCUSSION_PHASES = 50;
 const MAX_RESERVED_DISCUSSION_MESSAGES = 20;
 const RESERVED_DISCUSSION_TTL_MS = 30 * 60 * 1_000;
 
+// Static role-to-action map
 const BOT_NIGHT_ACTIONS_BY_ROLE: Record<string, PlayerActionType[]> = {
 	vampire: ["eliminate"],
 	bloodBank: ["eliminate"],
@@ -317,23 +276,23 @@ class BotService {
 	private readonly minimumRemainingRequestMs = 5_000;
 
 	private activeBotRequests = 0;
-	// Queue to avoit too many requests at the same time
+	// Ollama calls are throttled so several bots do not block the event loop with simultaneous long requests
 	private readonly botRequestQueue: Array<() => void> = [];
-	// Recent discussions to avoid repetition
+	// Tracks accepted and reserved bot lines per phase to reduce repeated AI phrasing
 	private readonly recentDiscussionMessagesByPhase = new Map<string, ReservedDiscussionMessages>();
 
 	async findBotPlayerById(botPlayerId: number): Promise<Bot | null> {
 		return await BotModel.findBotPlayerById(botPlayerId);
 	}
 
-	// Before game start, decide what kind of bot you are, baseline knowledge insertion
+	// Builds the long-lived bot memory once roles are assigned at game start
 	async generateBotProfile(gameId: number, botPlayerId: number, botSettings: BotSettings, lobbyPlayers: LobbyPlayer[], roleCatalog: Role[], rolesByPlayerId?: Map<number, Role>): Promise<void> {
 		const bot = await BotModel.findBotPlayerById(botPlayerId);
 		const settings = botSettings[botPlayerId];
 		const configuredDifficulty = settings?.difficulty as BotDifficulty | undefined;
 		const configuredPlaystyle = settings?.playstyle as BotPlaystyle | undefined;
 
-		// If random, assign randomly
+		// Random lobby settings are resolved once so the bot stays consistent throughout the game
 		const difficulty: FinalBotDifficulty = configuredDifficulty && configuredDifficulty !== "random" ? configuredDifficulty : botDifficultyKeys[Math.floor(Math.random() * botDifficultyKeys.length)];
 		const playstyle: FinalBotPlaystyle = configuredPlaystyle && configuredPlaystyle !== "random" ? configuredPlaystyle : botPlaystyleKeys[Math.floor(Math.random() * botPlaystyleKeys.length)];
 		
@@ -341,17 +300,15 @@ class BotService {
 		const botName = bot?.name ?? `Bot ${botPlayerId}`;
 		const ownRole = rolesByPlayerId?.get(botPlayerId) ?? null;
 
-		// Get available roles, if its not in the available roles, dont talk about such posibilities
+		// Only roles present in the current game are stored, preventing bots from discussing impossible roles
 		const availableRoles: BotRoleMemory[] = roleCatalog.map((role) => {
 			const rule = this.getRoleRule(role.key);
 			return { key: role.key, alignment: role.alignment, weight: role.weight, description: rule?.description ?? "Role exists in this game, but no bot rule description is defined.", nightActions: rule ? [...rule.nightActions] : ["skip"] };
 		});
 
-		// Remember all players who started the game with you
 		const players: BotMemoryPlayer[] = lobbyPlayers.map((player) => ({ playerId: player.playerId, username: player.username }));
 		const profile = this.createProfile(difficulty, playstyle, ownRole);
 
-		// Basic setup of memory
 		const memory: BotGameMemory = {
 			gameId,
 			playerId: botPlayerId,
@@ -365,12 +322,11 @@ class BotService {
 			decisionHistory: []
 		};
 
-		// Apply to database
 		await GameBotSetupModel.upsert({ gameId, playerId: botPlayerId });
 		await GameBotSetupModel.changeMemoryJson(gameId, botPlayerId, memory);
 	}
 
-	// Append phase results to all bots in the game when a phase rolls over
+	// Phase results become bot memory after resolution, so future prompts can use real outcomes
 	async appendPhaseResultsToBots(gameId: number, phase: PhaseType, dayNumber: number, phaseResult: PhaseResult, personalResults: Map<number, PersonalPhaseResult[]>, pendingActions: Map<number, PlayerAction>): Promise<void> {
 		const botSetups = await GameBotSetupModel.findByGameId(gameId);
 
@@ -403,34 +359,35 @@ class BotService {
 	}
 
 	async chooseVoteAction(gameId: number, playerId: number, dayNumber: number, players: GameStatePlayer[], gameChatMessages: ResponseGameChatMessage[], timeoutMs: number): Promise<PlayerAction> {
-		// Deadline so the bot knows how long it has to respond
 		const deadlineAt = Date.now() + timeoutMs;
+		const botSetup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
+		const botMemory = this.ensureMemoryObject(botSetup?.memoryJson, gameId, playerId);
 
-		// Generate for bot choices and targets
+		// Targets use temporary indexes so the model does not need database ids in its response
 		const targets = this.createTargetMemory(players, playerId, true, true);
 		const targetsForPrompt = targets.map(({ targetIndex, username }) => ({ targetIndex, username }));
+
+		// Based on choices and profile decide the plan for request
 		const choices = this.createActionChoices(["vote"]);
+		const actionPlan = this.createActionPlan(botMemory.profile, "voting");
 
 		// Ask AI
-		const result = await this.askBotWithMemory<{ choiceIndex: number; targetIndex: number | null; reason: string }>(gameId, playerId, BOT_ACTION_SYSTEM_MESSAGE,	{
-			timeLimit: {
-				timeoutMs,
-				minimumRemainingRequestMs: this.minimumRemainingRequestMs,
-				instruction: "Only respond if enough time remains. If unsure, return skip quickly."
-			},
+		const result = await this.askBotWithMemory<{ choiceIndex: number; targetIndex: number | null; reason: string }>(gameId, playerId, BOT_ACTION_SYSTEM_MESSAGE, {
+			timeLimit: { timeoutMs, minimumRemainingRequestMs: this.minimumRemainingRequestMs, instruction: BOT_RULE_BOOK.action.timeLimitInstruction },
 			phase: "voting",
 			availableActions: choices.map(({ choiceIndex, label, requiresTarget }) => ({ choiceIndex, label, requiresTarget })),
 			targets: targetsForPrompt,
+			actionPlan,
 			recentChat: this.createRecentChatMemory(gameChatMessages)
-		}, deadlineAt, { compactMemory: true, think: false } );
+		}, deadlineAt, { compactMemory: true, think: false }, botMemory);
 
-		// Parse action
+		// Validate response
 		const resultKeys = this.getObjectKeys(result);
 		const voteResult = this.readChoiceResult(result);
 		const selectedChoice = voteResult ? choices.find((choice) => choice.choiceIndex === voteResult.choiceIndex) : null;
 		let action: PlayerAction = { playerId, type: "skip", targetPlayerId: null };
 
-		// If invalid, log it, used for development
+		// Log bad responses in development
 		if (!voteResult || !selectedChoice) {
 			this.logBotFailure("Bot vote fell back to skip because no usable response was returned:", { gameId, playerId, dayNumber, timeoutMs });
 			if (result) {
@@ -439,32 +396,33 @@ class BotService {
 		} else if (selectedChoice.actionType === "vote") {
 			const target = targets.find((player) => player.targetIndex === voteResult.targetIndex);
 
-			if (target) { action = { playerId, type: "vote", targetPlayerId: target.playerId } } else {
+			if (target) {
+				action = { playerId, type: "vote", targetPlayerId: target.playerId };
+			} else {
 				this.logBotFailure("Bot vote fell back to skip because target was invalid:", { gameId, playerId, dayNumber, result: voteResult, targets });
 			}
 		} else if (voteResult.targetIndex !== null) {
 			this.logBotFailure("Bot vote returned skip with a target; target was ignored:", { gameId, playerId, dayNumber, result: voteResult });
 		}
 
-		// Append even if it was unsuccessful, it should know that it skipped
+		// Decisions are stored even after fallback so later prompts know the bot tried or skipped
 		await this.appendDecision(gameId, playerId, { dayNumber, phase: "voting", actionType: action.type, targetPlayerId: action.targetPlayerId, reason: voteResult?.reason?.trim() || "Fallback, timeout, skipped after queue, or invalid AI response." });
 		return action;
 	}
 
 	async chooseNightAction(gameId: number, playerId: number, actionState: BotNightActionState, players: GameStatePlayer[], gameChatMessages: ResponseGameChatMessage[], timeoutMs: number): Promise<PlayerAction> {
-		// Deadline so the bot knows how long it has to respond
 		const deadlineAt = Date.now() + timeoutMs;
-		const hasStrongPublicEvidence = gameChatMessages.some((message) => /\b(inspect(?:ed)?|watch(?:ed)?|saw|result|proof|confirmed|caught|contradict(?:ion|ed|s)?)\b/i.test(message.message));
+		const botSetup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
+		const botMemory = this.ensureMemoryObject(botSetup?.memoryJson, gameId, playerId);
 		
-		// Generate for bot choices and targets
+		// Find bots possible action
 		const possibleActions = actionState.roleKey ? BOT_NIGHT_ACTIONS_BY_ROLE[actionState.roleKey] ?? [] : [];
 		const actionTypes: PlayerActionType[] = [];
 
-		// More specific rule handling (can be skipped but better not for consistency)
+		// Server-side gates keep one-use and cooldown-blocked role actions out of the prompt
 		for (const actionType of possibleActions) {
 			switch (actionType) {
 				case "eliminate":
-					if (actionState.roleKey === "vigilante" && !hasStrongPublicEvidence) continue;
 					if (actionState.roleKey === "vampire" || actionState.roleKey === "bloodBank" || actionState.roleKey === "count") {
 						if (actionState.dayNumber !== 1 && actionState.vampireMissedEliminationCycles < 1) continue;
 					}
@@ -486,43 +444,43 @@ class BotService {
 			}
 		}
 
-		// Create target memory for the bot
+		// Targets use temporary indexes so the model does not need database ids in its response
 		const targets = this.createTargetMemory(players, playerId, false, false);
 		const targetsForPrompt = targets.map(({ targetIndex, username }) => ({ targetIndex, username }));
 		const choices = this.createActionChoices(actionTypes);
-		const skipAction: PlayerAction = { playerId, type: "skip", targetPlayerId: null };
 
-		// No valid role action or no valid target means the only action is skip (can be skipped but better not for consistency)
+		// Based on choices and profile decide the plan for request
+		const skipAction: PlayerAction = { playerId, type: "skip", targetPlayerId: null };
+		const actionPlan = this.createActionPlan(botMemory.profile, "night");
+
+		// Avoid calling the model when the only legal server outcome is skip
 		if (actionTypes.length === 0 || targets.length === 0) {
 			await this.appendDecision(gameId, playerId, { dayNumber: actionState.dayNumber, phase: "night", actionType: "skip", targetPlayerId: null, reason: actionTypes.length === 0 ? "No legal night action available." : "No valid night targets available." });
 			return skipAction;
 		}
 
 		// Ask AI
-		const result = await this.askBotWithMemory<{ choiceIndex: number; targetIndex: number | null; reason: string }>( gameId, playerId, BOT_ACTION_SYSTEM_MESSAGE, {
-			timeLimit: {
-				timeoutMs,
-				minimumRemainingRequestMs: this.minimumRemainingRequestMs,
-				instruction: "Only respond if enough time remains. If unsure, return skip quickly."
-			},
+		const result = await this.askBotWithMemory<{ choiceIndex: number; targetIndex: number | null; reason: string }>(gameId, playerId, BOT_ACTION_SYSTEM_MESSAGE, {
+			timeLimit: { timeoutMs, minimumRemainingRequestMs: this.minimumRemainingRequestMs, instruction: BOT_RULE_BOOK.action.timeLimitInstruction },
 			phase: "night",
 			availableActions: choices.map(({ choiceIndex, label, requiresTarget }) => ({ choiceIndex, label, requiresTarget })),
 			targets: targetsForPrompt,
+			actionPlan,
 			chroniclerTargetRole: actionState.chroniclerCurrentRoleKey,
 			recentChat: this.createRecentChatMemory(gameChatMessages)
-		}, deadlineAt, { compactMemory: true, think: false });
+		}, deadlineAt, { compactMemory: true, think: false }, botMemory);
 
-		// Parse results
+		// Validate response
 		let action: PlayerAction = skipAction;
 		const resultKeys = this.getObjectKeys(result);
 		const nightResult = this.readChoiceResult(result);
 		const selectedChoice = nightResult ? choices.find((choice) => choice.choiceIndex === nightResult.choiceIndex) : null;
 
-		// If invalid, log it, used for development
+		// Log bad responses in development
 		if (!nightResult || !selectedChoice) {
 			this.logBotFailure("Bot night action fell back to skip because no usable response was returned:", { gameId, playerId, dayNumber: actionState.dayNumber, timeoutMs });
 			if (result) {
-				this.logBotFailure("Bot night action response had invalid shape:", {  gameId, playerId, dayNumber: actionState.dayNumber, reason: "invalid_shape", resultKeys });
+				this.logBotFailure("Bot night action response had invalid shape:", { gameId, playerId, dayNumber: actionState.dayNumber, reason: "invalid_shape", resultKeys });
 			}
 		} else if (selectedChoice.actionType === "skip") {
 			if (nightResult.targetIndex !== null) {
@@ -537,28 +495,21 @@ class BotService {
 			}
 		}
 
-		// Append even if it was unsuccessful, it should know that it skipped
+		// Decisions are stored even after fallback so later prompts know the bot tried or skipped
 		await this.appendDecision(gameId, playerId, { dayNumber: actionState.dayNumber, phase: "night", actionType: action.type, targetPlayerId: action.targetPlayerId, reason: nightResult?.reason?.trim() || "Fallback, timeout, skipped after queue, or invalid AI response." });
 		return action;
 	}
 
 	async createDiscussionMessage(gameId: number, playerId: number, phase: PhaseType, dayNumber: number, players: GameStatePlayer[], gameChatMessages: ResponseGameChatMessage[], timeoutMs: number): Promise<CreateGameChatMessage | null> {
-		// Deadline so the bot knows how long it has to respond
 		const deadlineAt = Date.now() + timeoutMs;
-
-		// Load bot memory before building discussion context
 		const botSetup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
 		const botMemory = this.ensureMemoryObject(botSetup?.memoryJson, gameId, playerId);
 
-		// Check if bot has private results worth mentioning
-		const hasRecentFindings = Array.isArray(botMemory.phaseHistory) && botMemory.phaseHistory.some((entry) => {
-			const historyEntry = entry as Partial<BotPhaseHistoryEntry>;
-			return Array.isArray(historyEntry.personalResult) && historyEntry.personalResult.length > 0;
-		});
-
+		// Get recent data
+		const hasRecentFindings = this.hasRecentFindings(botMemory);
 		const recentChatMemory = this.createRecentChatMemory(gameChatMessages);
 
-		// Track recent bot messages to avoid repeated lines
+		// Anti-repeat context combines public chat, own memory, and reserved lines from concurrent bots
 		const recentBotMessages = this.getRecentMessageTexts(recentChatMemory, (message) => message.messageType === "bot", MAX_RESERVED_DISCUSSION_MESSAGES);
 		const recentOwnChatMessages = this.getRecentMessageTexts(recentChatMemory, (message) => message.playerId === playerId && message.messageType === "bot", 8);
 		const recentOwnMemoryMessages = this.getRecentDecisionMessages(botMemory, 12);
@@ -566,119 +517,65 @@ class BotService {
 		const reservedBotMessages = this.getReservedDiscussionMessages(gameId, phase, dayNumber);
 		const antiRepeatMessages = this.combineMessageLists(recentBotMessages, reservedBotMessages, MAX_RESERVED_DISCUSSION_MESSAGES);
 
-		// Get bot name for mention detection
+		// Find yourself
 		const ownName = players.find((player) => player.playerId === playerId)?.username ?? "";
+		// Public player data is enough for discussion
+		const visiblePlayers = players.map((player) => ({ playerId: player.playerId, username: player.username, isEliminated: player.isEliminated}));
+		// Get recent players who talked
+		const spokenPlayerIds = Array.from(new Set(gameChatMessages.map((message) => message.playerId).filter((id): id is number => id !== null)));
+		// Mentions get special handling so the bot is more likely to answer direct questions.
+		const recentQuestions = recentChatMemory.filter((message) => message.playerId !== playerId && message.message.includes("?")).slice(-5).map((message) => ({ playerId: message.playerId, name: message.name, message: message.message, mentionsMe: ownName.length > 0 && message.message.toLowerCase().includes(ownName.toLowerCase())}));
+		// Claims are separated from normal chat because they often require direct follow-up questions.
+		const recentClaims = recentChatMemory.filter((message) => message.playerId !== playerId && /\b(eliminated|converted|jailed|protected|inspected|watched|guessed|attacked)\b/i.test(message.message)).slice(-5).map((message) => ({ playerId: message.playerId, name: message.name, message: message.message }));
+		const hasDiscussionEvidence = hasRecentFindings || recentClaims.length > 0 || this.hasRecentPublicResults(botMemory);
 
-		// Prepare visible player list for prompt
-		const visiblePlayers = players.map((player) => ({
-			playerId: player.playerId,
-			username: player.username,
-			isEliminated: player.isEliminated
-		}));
-
-		// Track who already spoke this phase
-		const spokenPlayerIds = Array.from(new Set(gameChatMessages
-			.map((message) => message.playerId)
-			.filter((id): id is number => id !== null)));
-
-		// Collect recent questions from other players
-		const recentQuestions = recentChatMemory
-			.filter((message) => message.playerId !== playerId && message.message.includes("?"))
-			.slice(-5)
-			.map((message) => ({
-				playerId: message.playerId,
-				name: message.name,
-				message: message.message,
-				mentionsMe: ownName.length > 0 && message.message.toLowerCase().includes(ownName.toLowerCase())
-			}));
-
-		// Collect recent action or result claims from other players
-		const recentClaims = recentChatMemory
-			.filter((message) => message.playerId !== playerId && /\b(eliminated|converted|jailed|protected|inspected|watched|guessed|attacked)\b/i.test(message.message))
-			.slice(-5)
-			.map((message) => ({
-				playerId: message.playerId,
-				name: message.name,
-				message: message.message
-			}));
-
-		// Read deception behavior from bot profile
-		const talkStyle = (botMemory.profile as Partial<BotProfile> | undefined)?.talkStyle as Partial<BotProfile["talkStyle"]> | undefined;
-		const deceptionRate = talkStyle?.deceptionRate ?? "low";
-		// Convert deception style into random chance
-		let deceptionChance = deceptionRate === "high" ? 0.82 : deceptionRate === "medium" ? 0.48 : 0.16;
-		// Reduce deception on first day to avoid early baseless accusations
-		if (dayNumber === 1 && phase === "day") {
-			deceptionChance = Math.min(deceptionChance, 0.2);
-		}
-		// Prepare deception plan for prompt
-		const deceptionPlan = { deceptionRate, deceptionChance, shouldDeceive: Math.random() < deceptionChance };
-
-		// Read chatter behavior from bot profile
-		const chatterRate = talkStyle?.questionRate ?? "medium";
-		const claimRate = talkStyle?.claimRate ?? "low";
-		let chatterChance = chatterRate === "high" ? 0.34 : chatterRate === "medium" ? 0.26 : 0.18;
-
-		if (!hasRecentFindings) {
-			chatterChance += 0.18;
-		}
-		if (claimRate === "high") {
-			chatterChance -= 0.08;
-		}
-		if (recentQuestions.some((question) => question.mentionsMe) || recentClaims.length > 0 || phase === "voting") {
-			chatterChance = Math.min(chatterChance, 0.12);
-		}
-		if (dayNumber === 1 && phase === "day") {
-			chatterChance = Math.max(chatterChance, 0.45);
-		}
-
-		// Prepare chatter plan for prompt
-		const chatterPlan = { chatterRate, chatterChance, shouldChatter: Math.random() < chatterChance };
+		// Profile settings become concrete yes/no plans before the model sees the prompt.
+		const discussionPlans = this.createDiscussionPlans(botMemory.profile, {
+			phase,
+			dayNumber,
+			hasRecentFindings: hasDiscussionEvidence,
+			hasMentionedQuestion: recentQuestions.some((question) => question.mentionsMe),
+			hasRecentClaims: recentClaims.length > 0
+		});
 
 		// Ask AI
 		const result = await this.askBotWithMemory<{ message: string; reason: string }>(gameId, playerId, BOT_DISCUSSION_SYSTEM_MESSAGE, {
-			timeLimit: {
-				timeoutMs,
-				minimumRemainingRequestMs: this.minimumRemainingRequestMs,
-				instruction: "Only respond if enough time remains, keep the message short."
-			},
+			timeLimit: { timeoutMs, minimumRemainingRequestMs: this.minimumRemainingRequestMs, instruction: BOT_RULE_BOOK.discussion.timeLimitInstruction },
 			phase,
 			dayNumber,
 			players: visiblePlayers,
-			discussionState: { isFirstDay: dayNumber === 1 && phase === "day", spokenPlayerIds, recentBotMessages, recentQuestions, recentClaims, deceptionPlan, chatterPlan,
-				antiRepeat: { recentOwnMessages, recentTableBotMessages: antiRepeatMessages, instruction: "Do not copy these lines. Keep the same meaning only when useful, but use different wording and current game context." },
-				goal: dayNumber === 1 && phase === "day"
-					? "Light first-day table chat only and greetings. No suspect names, no pressure, no accusations."
-					: phase === "voting"
-						? "Vote only from true evidence: public results, vote history, direct contradiction, or personal findings. Otherwise say skipping is cleaner."
-						: "Answer questions first. If someone made an action claim, ask for target/result details. If memory.recentFindings has entries, share the useful part if it benefits you and your side. If not, say you have nothing solid or use harmless chatter when chatterPlan allows it."
+			recentChat: recentChatMemory,
+			discussionState: {
+				isFirstDay: dayNumber === 1 && phase === "day",
+				spokenPlayerIds,
+				recentBotMessages,
+				recentQuestions,
+				recentClaims,
+				...discussionPlans,
+				antiRepeat: { recentOwnMessages, recentTableBotMessages: antiRepeatMessages, instruction: BOT_RULE_BOOK.discussion.antiRepeatInstruction },
+				goal: this.getDiscussionGoal(phase, dayNumber)
 			}
-		},  deadlineAt, { compactMemory: true, includePrivateRole: true, temperature: 0.6 });
+		}, deadlineAt, { compactMemory: true, includePrivateRole: true, temperature: 0.6 }, botMemory);
 
-		// Parse discussion response
+		// Validate response
 		const resultKeys = this.getObjectKeys(result);
 		const rawDiscussion = result !== null && typeof result === "object" ? result as { message?: unknown; reason?: unknown } : null;
 		const discussionResult = typeof rawDiscussion?.message === "string" ? { message: rawDiscussion.message.trim(), reason: typeof rawDiscussion.reason === "string" ? rawDiscussion.reason.trim() : "" } : null;
-
-		// Log invalid discussion shape
 		if (result && !discussionResult) {
 			this.logBotFailure("Bot discussion response had invalid shape:", { gameId, playerId, phase, dayNumber, reason: "invalid_shape", resultKeys });
 		}
 
-		// Clean generated message before showing it publicly
+		// Remove model-added labels before the message reaches public chat
 		let message = (discussionResult?.message ?? "").trim();
 		const escapedOwnName = ownName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 		message = message.replace(/^(name|message)\s*:\s*/i, "");
 		if (escapedOwnName) {
 			message = message.replace(new RegExp(`^${escapedOwnName}\\s*:\\s*`, "i"), "");
 		}
 
-		// Normalize message for safety checks
 		message = message.trim();
 		const normalizedMessage = message.toLowerCase();
 
-		// Check if message is too similar to recent bot messages
 		const repeatsOwnMessage = recentOwnMessages.some((recentMessage) => {
 			return this.areMessagesTooSimilar(recentMessage, normalizedMessage);
 		});
@@ -686,113 +583,60 @@ class BotService {
 			return this.areMessagesTooSimilar(recentMessage, normalizedMessage);
 		});
 
-		// Detect suspicious wording that should require evidence
+		// Suspicion phrasing is allowed, but weak or repeated baseless suspicion is filtered before insert
+		// Keep bot chat varied and evidence-based before it reaches the public table
 		const namesSuspicion = /\b(suspicious|hiding|cover|vampire|eliminated|killed|moved|visited|avoiding|watch(?:ing|ed)?|not sure what that means|keeping an eye|jump|pressure)\b/.test(normalizedMessage);
 		const weakEvidence = /\b(quiet|silence|vibe|shadow|shadows|whisper|whispers|watched|watching|talking to|avoiding the group)\b/.test(normalizedMessage);
-		const baselessSuspicion = (dayNumber === 1 && phase === "day" && namesSuspicion) || (!hasRecentFindings && namesSuspicion && weakEvidence);
+		const baselessSuspicion = (dayNumber === 1 && phase === "day" && namesSuspicion) || (!hasDiscussionEvidence && namesSuspicion && weakEvidence);
 		const baselessAccusationUsed = Array.isArray(botMemory.decisionHistory) && botMemory.decisionHistory.some((entry) => {
 			const decision = entry as Partial<BotDecisionHistoryEntry>;
 			return typeof decision.reason === "string" && decision.reason.includes("baseless_accusation");
 		});
+		const allowImperfectMessage = this.rollChance(0.18);
 		let repeatFallbackReason: string | null = null;
 
-		// Keep bot chat varied and evidence-based before it reaches the public table.
+		// Log bad responses in development
 		if (!message) {
 			this.logBotFailure("Bot discussion skipped message:", { gameId, playerId, phase, dayNumber, reason: !discussionResult ? "no usable response" : "empty message", result: discussionResult });
 			return null;
 		} else if (repeatsOwnMessage || repeatsTableMessage) {
 			const fallbackMessage = this.createNonRepeatingDiscussionFallback(phase, dayNumber, playerId, this.combineMessageLists(recentOwnMessages, antiRepeatMessages, MAX_RESERVED_DISCUSSION_MESSAGES + 8));
-
 			if (!fallbackMessage) {
-				this.logBotFailure("Bot discussion skipped message:", { gameId, playerId, phase, dayNumber, reason: repeatsOwnMessage ? "repeated_own_bot_message" : "repeated_table_bot_message", result: discussionResult});
+				this.logBotFailure("Bot discussion skipped message:", { gameId, playerId, phase, dayNumber, reason: repeatsOwnMessage ? "repeated_own_bot_message" : "repeated_table_bot_message", result: discussionResult });
 
 				return null;
 			}
-
 			message = fallbackMessage;
 			repeatFallbackReason = repeatsOwnMessage ? "fallback_after_repeated_own_bot_message" : "fallback_after_repeated_table_bot_message";
-		} else if (baselessSuspicion && baselessAccusationUsed) {
+		} else if (baselessSuspicion && baselessAccusationUsed && !allowImperfectMessage) {
 			this.logBotFailure("Bot discussion skipped message:", { gameId, playerId, phase, dayNumber, reason: "baseless_suspicion", result: discussionResult });
 			return null;
 		}
 
+		// Appeand text and respon to bot and return
 		this.rememberReservedDiscussionMessage(gameId, phase, dayNumber, message);
-
-		const decisionReason = [discussionResult?.reason.trim() || "Fallback, timeout, skipped after queue, or invalid AI response.", repeatFallbackReason, repeatFallbackReason ? null : baselessSuspicion ? "baseless_accusation" : null]
-			.filter((entry): entry is string => Boolean(entry))
-			.join(" | ");
-
-		// Save accepted discussion message as a bot decision
+		const decisionReason = [discussionResult?.reason.trim() || "Fallback, timeout, skipped after queue, or invalid AI response.", repeatFallbackReason, repeatFallbackReason ? null : baselessSuspicion ? "baseless_accusation" : null].filter((entry): entry is string => Boolean(entry)).join(" | ");
 		await this.appendDecision(gameId, playerId, { dayNumber, phase, message, reason: decisionReason });
-
-		// Return message object for chat insertion
 		return { gameId, playerId, message, dayNumber, phase, messageType: "bot" };
 	}
 
-	private async askBotWithMemory<T>(gameId: number, playerId: number, systemMessage: string, payload: Record<string, unknown>, deadlineAt?: number, options: BotJsonOptions = {}): Promise<T | null> {
-		const setup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
-		// Log missing memory setup but continue with fallback memory
-		if (!setup) {
-			this.logBotFailure("Bot memory was missing; request will use fallback memory object:", { gameId, playerId });
-		}
+	private async askBotWithMemory<T>(gameId: number, playerId: number, systemMessage: string, payload: Record<string, unknown>, deadlineAt?: number, options: BotJsonOptions = {}, prefetchedMemory?: Record<string, unknown>): Promise<T | null> {
+		const memory = prefetchedMemory ?? await this.loadBotMemory(gameId, playerId);
+		const requestMemory = this.createRequestMemory(memory, options);
 
-		// Load full memory object
-		const memory = this.ensureMemoryObject(setup?.memoryJson, gameId, playerId);
-		let requestMemory = memory;
-
-		// Reduce memory size for faster and cheaper bot requests
-		if (options.compactMemory) {
-			// Get available role keys for compact rulebook creation
-			const availableRoleKeys = Array.isArray(memory.availableRoles) ? memory.availableRoles.map((role) => (role as Partial<BotRoleMemory>).key).filter((key): key is string => typeof key === "string") : [];
-			// Keep only recent phase history
-			const phaseHistory = Array.isArray(memory.phaseHistory) ? (memory.phaseHistory as Partial<BotPhaseHistoryEntry>[]).slice(-5) : [];
-			// Keep only recent decision history
-			const decisionHistory = Array.isArray(memory.decisionHistory) ? (memory.decisionHistory as Partial<BotDecisionHistoryEntry>[]).slice(-5) : [];
-			// Extract recent private results
-			const recentFindings = phaseHistory.filter((entry) => Array.isArray(entry.personalResult) && entry.personalResult.length > 0).map((entry) => ({dayNumber: entry.dayNumber, phase: entry.phase, personalResult: entry.personalResult }));
-
-			// Build compact memory payload for AI
-			requestMemory = { gameId: memory.gameId, playerId: memory.playerId, name: memory.name, ownRoleKey: options.includePrivateRole === false ? undefined : memory.ownRoleKey,
-				ownAlignment: options.includePrivateRole === false ? undefined : memory.ownAlignment,
-				phaseHistory: phaseHistory.map((entry) => ({
-					dayNumber: entry.dayNumber,
-					phase: entry.phase,
-					submittedAction: entry.submittedAction,
-					publicResult: entry.publicResult
-				})),
-				recentFindings,
-				decisionHistory: decisionHistory.map((entry) => ({
-					dayNumber: entry.dayNumber,
-					phase: entry.phase,
-					actionType: entry.actionType,
-					targetPlayerId: entry.targetPlayerId,
-					message: entry.message
-				})),
-				rules: {
-					mustReadBeforeDiscussion: BOT_RULE_BOOK.mustReadBeforeDiscussion,
-					mustReadBeforeVoting: BOT_RULE_BOOK.mustReadBeforeVoting,
-					mustReadBeforeNightAction: BOT_RULE_BOOK.mustReadBeforeNightAction,
-					winConditions: BOT_RULE_BOOK.winConditions,
-					roles: this.createRuleBookForAvailableRoleKeys(availableRoleKeys).roles
-				},
-				profile: memory.profile
-			};
-		}
-
-		// Create Ollama chat messages
 		const messages: { role: "system" | "user"; content: string }[] = [
 			{ role: "system", content: systemMessage },
 			{ role: "user", content: JSON.stringify({ memory: requestMemory, ...payload }) }
 		];
 
-		// Queue request if too many bot requests are active
+		// Local LLM calls can be slow, so requests are queued instead of launched all at once
 		if (this.activeBotRequests >= MAX_PARALLEL_BOT_REQUESTS) {
 			await new Promise<void>((resolve) => {
 				this.botRequestQueue.push(resolve);
 			});
 		}
 
-		// Check remaining phase time before starting request
+		// A late model response is worse than a skipped bot action
 		const remainingMs = deadlineAt ? deadlineAt - Date.now() : undefined;
 		if (remainingMs !== undefined && remainingMs < this.minimumRemainingRequestMs) {
 			const next = this.botRequestQueue.shift();
@@ -810,19 +654,14 @@ class BotService {
 			return null;
 		}
 
-		// Mark this bot request as active
 		this.activeBotRequests++;
 
 		try {
-			// Prepare abort controller for phase deadline timeout
 			const controller = new AbortController();
 			const timeout = remainingMs && remainingMs > 0 ? setTimeout(() => controller.abort(), remainingMs) : null;
-
-			// Prepare model options
 			const requestOptions: Record<string, unknown> = { temperature: options.temperature ?? 0.4 };
 
 			try {
-				// Send request to Ollama
 				const headers: Record<string, string> = { "Content-Type": "application/json" };
 				if (this.llamaApiKey) {
 					headers.Authorization = `Bearer ${this.llamaApiKey}`;
@@ -842,7 +681,6 @@ class BotService {
 					})
 				});
 
-				// Handle failed Ollama response
 				if (!response.ok) {
 					const body = await response.text().catch(() => "");
 
@@ -850,25 +688,21 @@ class BotService {
 					return null;
 				}
 
-				// Read Ollama response JSON
 				const data = await response.json() as { message?: { content?: string } };
 				const content = data.message?.content;
 
-				// Require message content from Ollama
 				if (!content) {
 					this.logBotFailure("Ollama bot response did not include message content:", { model: this.llamaModel, reason: "missing_content", data });
 					return null;
 				}
 
 				try {
-					// Parse bot JSON response
 					return JSON.parse(content) as T;
 				} catch (error) {
 					this.logBotFailure("Ollama bot response was not valid JSON:", { model: this.llamaModel, reason: "invalid_json", error, content });
 					return null;
 				}
 			} catch (error) {
-				// Handle request timeout separately from other request errors
 				if (error instanceof DOMException && error.name === "AbortError") {
 					this.logBotFailure("Ollama bot request timed out before phase ended", { model: this.llamaModel, reason: "timeout", remainingMs });
 				} else {
@@ -876,16 +710,14 @@ class BotService {
 				}
 				return null;
 			} finally {
-				// Clear timeout after request finishes
 				if (timeout) {
 					clearTimeout(timeout);
 				}
 			}
 		} finally {
-			// Mark request as finished
 			this.activeBotRequests--;
 
-			// Start next queued bot request
+			// Release exactly one queued bot request after this request finishes or fails
 			const next = this.botRequestQueue.shift();
 			if (next) {
 				next();
@@ -893,8 +725,48 @@ class BotService {
 		}
 	}
 
+	private createRequestMemory(memory: Record<string, unknown>, options: BotJsonOptions): Record<string, unknown> {
+		if (!options.compactMemory) {
+			return memory;
+		}
+
+		// Compact memory keeps prompts bounded while preserving recent context, findings, and rules
+		const availableRoleKeys = Array.isArray(memory.availableRoles) ? memory.availableRoles.map((role) => (role as Partial<BotRoleMemory>).key).filter((key): key is string => typeof key === "string") : [];
+		const phaseHistory = Array.isArray(memory.phaseHistory) ? (memory.phaseHistory as Partial<BotPhaseHistoryEntry>[]).slice(-5) : [];
+		const decisionHistory = Array.isArray(memory.decisionHistory) ? (memory.decisionHistory as Partial<BotDecisionHistoryEntry>[]).slice(-5) : [];
+		const recentFindings = phaseHistory
+			.filter((entry) => Array.isArray(entry.personalResult) && entry.personalResult.length > 0)
+			.map((entry) => ({ dayNumber: entry.dayNumber, phase: entry.phase, personalResult: entry.personalResult }));
+
+		return {
+			gameId: memory.gameId,
+			playerId: memory.playerId,
+			name: memory.name,
+			ownRoleKey: options.includePrivateRole === false ? undefined : memory.ownRoleKey,
+			ownAlignment: options.includePrivateRole === false ? undefined : memory.ownAlignment,
+			phaseHistory: phaseHistory.map((entry) => ({
+				dayNumber: entry.dayNumber,
+				phase: entry.phase,
+				submittedAction: entry.submittedAction,
+				publicResult: entry.publicResult
+			})),
+			recentFindings,
+			decisionHistory: decisionHistory.map((entry) => ({
+				dayNumber: entry.dayNumber,
+				phase: entry.phase,
+				actionType: entry.actionType,
+				targetPlayerId: entry.targetPlayerId,
+				message: entry.message
+			})),
+			rules: this.createRuleBookForAvailableRoleKeys(availableRoleKeys)
+		};
+	}
+
 	private async appendDecision(gameId: number, playerId: number, entry: BotDecisionHistoryEntry): Promise<void> {
 		const setup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
+		if (!setup) return;
+
+		// Decision history is bounded because it is sent back into later model prompts
 		const memory = this.ensureMemoryObject(setup?.memoryJson, gameId, playerId);
 		const decisionHistory = Array.isArray(memory.decisionHistory) ? [...memory.decisionHistory] : [];
 
@@ -904,9 +776,14 @@ class BotService {
 		await GameBotSetupModel.changeMemoryJson(gameId, playerId, memory);
 	}
 
-	private normalizeOllamaChatUrl(url: string): string {
-		const cleanUrl = url.replace(/\/+$/, "");
-		return cleanUrl.endsWith("/api/chat") ? cleanUrl : `${cleanUrl}/api/chat`;
+	private async loadBotMemory(gameId: number, playerId: number): Promise<Record<string, unknown>> {
+		const setup = await GameBotSetupModel.findByGameIdAndPlayerId(gameId, playerId);
+
+		if (!setup) {
+			this.logBotFailure("Bot memory was missing; request will use fallback memory object:", { gameId, playerId });
+		}
+
+		return this.ensureMemoryObject(setup?.memoryJson, gameId, playerId);
 	}
 
 	private createProfile(difficulty: FinalBotDifficulty, playstyle: FinalBotPlaystyle, role: Role | null): BotProfile {
@@ -916,17 +793,15 @@ class BotService {
 				voteRisk: DEFAULT_BOT_PROFILE.actionStyle.voteRisk,
 				nightRisk: DEFAULT_BOT_PROFILE.actionStyle.nightRisk,
 				targetPriority: [...DEFAULT_BOT_PROFILE.actionStyle.targetPriority]
-			},
-			behavior: [...DEFAULT_BOT_PROFILE.behavior],
-			strategyHints: [...DEFAULT_BOT_PROFILE.strategyHints]
+			}
 		};
 
+		// Patch order gives lobby playstyle the final say over difficulty, then alignment adds target priorities
 		this.applyProfilePatch(profile, BOT_DIFFICULTY_PATCHES[difficulty]);
 		this.applyProfilePatch(profile, BOT_PLAYSTYLE_PATCHES[playstyle]);
 
 		if (role) {
 			this.applyProfilePatch(profile, BOT_ALIGNMENT_PATCHES[role.alignment]);
-			this.addListItems(profile.strategyHints, this.getRoleRule(role.key)?.strategyHints);
 		}
 
 		return profile;
@@ -948,16 +823,148 @@ class BotService {
 		}
 
 		this.addListItems(profile.actionStyle.targetPriority, patch.actionStyle?.targetPriority);
-		this.addListItems(profile.behavior, patch.behavior);
-		this.addListItems(profile.strategyHints, patch.strategyHints);
 	}
 
 	private addListItems(target: string[], items: readonly string[] | string[] | undefined): void {
 		if (!items) return;
 
 		for (const item of items) {
-			target.push(item);
+			const cleanItem = item.trim();
+
+			// Target priorities are additive, but duplicated hints only make prompts noisier
+			if (cleanItem && !target.some((targetItem) => targetItem.toLowerCase() === cleanItem.toLowerCase())) {
+				target.push(cleanItem);
+			}
 		}
+	}
+
+	private hasRecentFindings(memory: Record<string, unknown>): boolean {
+		return Array.isArray(memory.phaseHistory) && memory.phaseHistory.some((entry) => {
+			const historyEntry = entry as Partial<BotPhaseHistoryEntry>;
+			return Array.isArray(historyEntry.personalResult) && historyEntry.personalResult.length > 0;
+		});
+	}
+
+	private hasRecentPublicResults(memory: Record<string, unknown>): boolean {
+		if (!Array.isArray(memory.phaseHistory)) return false;
+
+		return memory.phaseHistory.some((entry) => {
+			const phaseResult = (entry as Partial<BotPhaseHistoryEntry>).publicResult;
+
+			return Boolean(phaseResult && ((phaseResult.eliminated?.length ?? 0) > 0 || (phaseResult.votes?.length ?? 0) > 0));
+		});
+	}
+
+	private createDiscussionPlans(profileJson: unknown, context: BotDiscussionPlanContext): BotDiscussionPlans {
+		const talkStyle = this.readBotProfile(profileJson).talkStyle;
+		const confidenceRate = talkStyle.confidence;
+		const deceptionRate = talkStyle.deceptionRate;
+		const chatterRate = talkStyle.questionRate;
+		const accusationRate = talkStyle.accusationRate;
+		const claimRate = talkStyle.claimRate;
+		const confidenceMultiplier = confidenceRate === "high" ? 1.15 : confidenceRate === "medium" ? 1 : 0.75;
+
+		let deceptionChance = deceptionRate === "high" ? 0.82 : deceptionRate === "medium" ? 0.48 : 0.16;
+		let chatterChance = chatterRate === "high" ? 0.34 : chatterRate === "medium" ? 0.26 : 0.18;
+		let accusationChance = accusationRate === "high" ? 0.56 : accusationRate === "medium" ? 0.32 : 0.12;
+		let claimChance = claimRate === "high" ? 0.42 : claimRate === "medium" ? 0.22 : 0.08;
+
+		// Confidence makes assertive plans more likely without changing the profile itself
+		deceptionChance *= confidenceMultiplier;
+		accusationChance *= confidenceMultiplier;
+		claimChance *= confidenceMultiplier;
+
+		// Without private findings, the bot may chatter more but should accuse or claim less
+		if (!context.hasRecentFindings) {
+			chatterChance += 0.18;
+			accusationChance *= 0.5;
+			claimChance *= 0.45;
+		}
+		if (claimRate === "high") {
+			chatterChance -= 0.08;
+		}
+		if (context.hasMentionedQuestion || context.hasRecentClaims || context.phase === "voting") {
+			chatterChance = Math.min(chatterChance, 0.12);
+		}
+		if (context.hasMentionedQuestion) {
+			claimChance += 0.12;
+		}
+		// Day one should feel alive without letting bots manufacture early pressure
+		if (context.dayNumber === 1 && context.phase === "day") {
+			deceptionChance = Math.min(deceptionChance, 0.2);
+			chatterChance = Math.max(chatterChance, 0.45);
+			accusationChance = 0;
+		}
+
+		deceptionChance = this.clampChance(deceptionChance);
+		chatterChance = this.clampChance(chatterChance);
+		accusationChance = this.clampChance(accusationChance);
+		claimChance = this.clampChance(claimChance);
+
+		return {
+			deceptionPlan: { deceptionRate, deceptionChance, shouldDeceive: this.rollChance(deceptionChance) },
+			chatterPlan: { chatterRate, chatterChance, shouldChatter: this.rollChance(chatterChance) },
+			accusationPlan: { accusationRate, accusationChance, shouldAccuse: this.rollChance(accusationChance) },
+			claimPlan: { claimRate, claimChance, shouldClaim: this.rollChance(claimChance) }
+		};
+	}
+
+	private createActionPlan(profileJson: unknown, phase: "voting" | "night"): BotActionPlan {
+		const profile = this.readBotProfile(profileJson);
+		const riskLevel = phase === "voting" ? profile.actionStyle.voteRisk : profile.actionStyle.nightRisk;
+		const riskChance = riskLevel === "risky" ? 0.72 : riskLevel === "balanced" ? 0.45 : 0.18;
+
+		return { riskLevel, riskChance, shouldTakeRisk: this.rollChance(riskChance), targetPriority: profile.actionStyle.targetPriority };
+	}
+
+	private readBotProfile(profileJson: unknown): BotProfile {
+		const profile: BotProfile = {
+			talkStyle: { ...DEFAULT_BOT_PROFILE.talkStyle },
+			actionStyle: {
+				voteRisk: DEFAULT_BOT_PROFILE.actionStyle.voteRisk,
+				nightRisk: DEFAULT_BOT_PROFILE.actionStyle.nightRisk,
+				targetPriority: [...DEFAULT_BOT_PROFILE.actionStyle.targetPriority]
+			}
+		};
+
+		// Bot memory is persisted JSON, so every field is read defensively before use
+		if (profileJson === null || typeof profileJson !== "object" || Array.isArray(profileJson)) {
+			return profile;
+		}
+
+		const storedProfile = profileJson as Partial<BotProfile>;
+
+		if (storedProfile.talkStyle && typeof storedProfile.talkStyle === "object") {
+			profile.talkStyle = {
+				confidence: this.readRateLevel(storedProfile.talkStyle.confidence, profile.talkStyle.confidence),
+				accusationRate: this.readRateLevel(storedProfile.talkStyle.accusationRate, profile.talkStyle.accusationRate),
+				claimRate: this.readRateLevel(storedProfile.talkStyle.claimRate, profile.talkStyle.claimRate),
+				deceptionRate: this.readRateLevel(storedProfile.talkStyle.deceptionRate, profile.talkStyle.deceptionRate),
+				questionRate: this.readRateLevel(storedProfile.talkStyle.questionRate, profile.talkStyle.questionRate)
+			};
+		}
+
+		if (storedProfile.actionStyle && typeof storedProfile.actionStyle === "object") {
+			profile.actionStyle = {
+				voteRisk: this.readRiskLevel(storedProfile.actionStyle.voteRisk, profile.actionStyle.voteRisk),
+				nightRisk: this.readRiskLevel(storedProfile.actionStyle.nightRisk, profile.actionStyle.nightRisk),
+				targetPriority: this.readStringList(storedProfile.actionStyle.targetPriority, profile.actionStyle.targetPriority)
+			};
+		}
+
+		return profile;
+	}
+
+	private getDiscussionGoal(phase: PhaseType, dayNumber: number): string {
+		if (dayNumber === 1 && phase === "day") {
+			return BOT_RULE_BOOK.discussion.goals.firstDay;
+		}
+
+		if (phase === "voting") {
+			return BOT_RULE_BOOK.discussion.goals.voting;
+		}
+
+		return BOT_RULE_BOOK.discussion.goals.regular;
 	}
 
 	private getRoleRule(roleKey: string): typeof BOT_RULE_BOOK.roles[keyof typeof BOT_RULE_BOOK.roles] | undefined {
@@ -965,23 +972,20 @@ class BotService {
 	}
 
 	private createRuleBookForAvailableRoleKeys(availableRoleKeys: string[]): BotRuleBookMemory {
+		// Only send role rules that can appear in this game, reducing hallucinated role discussion
 		const allowedRoleKeys = new Set(availableRoleKeys);
-		const roles = Object.fromEntries(
-			Object.entries(BOT_RULE_BOOK.roles).filter(([roleKey]) => allowedRoleKeys.has(roleKey))
-		) as Partial<typeof BOT_RULE_BOOK.roles>;
+		const roles = Object.fromEntries(Object.entries(BOT_RULE_BOOK.roles).filter(([roleKey]) => allowedRoleKeys.has(roleKey))) as Partial<typeof BOT_RULE_BOOK.roles>;
 
 		return { ...BOT_RULE_BOOK, roles };
 	}
 
 	private createTargetMemory(players: GameStatePlayer[], playerId: number, includeSelf: boolean, includeKnownAlly: boolean) {
-		return players
-			.filter((player) => !player.isEliminated)
-			.filter((player) => includeSelf || player.playerId !== playerId)
-			.filter((player) => includeKnownAlly || !player.isKnownAlly)
-			.map((player, index) => ({ targetIndex: index, playerId: player.playerId, username: player.username }));
+		// Target indexes are prompt-local and later mapped back to player ids after validation
+		return players.filter((player) => !player.isEliminated).filter((player) => includeSelf || player.playerId !== playerId).filter((player) => includeKnownAlly || !player.isKnownAlly).map((player, index) => ({ targetIndex: index, playerId: player.playerId, username: player.username }));
 	}
 
 	private createActionChoices(actionTypes: PlayerActionType[]): BotActionChoice[] {
+		// Skip is always option zero so malformed or cautious decisions have a safe fallback
 		const choices: BotActionChoice[] = [{
 			choiceIndex: 0,
 			actionType: "skip",
@@ -1003,32 +1007,6 @@ class BotService {
 		return choices;
 	}
 
-	private readChoiceResult(result: unknown): BotChoiceResult | null {
-		if (result === null || typeof result !== "object") return null;
-
-		const raw = result as { choiceIndex?: unknown; targetIndex?: unknown; reason?: unknown };
-		const choiceIndex = typeof raw.choiceIndex === "number" && Number.isInteger(raw.choiceIndex)
-			? raw.choiceIndex
-			: typeof raw.choiceIndex === "string" && /^\d+$/.test(raw.choiceIndex.trim())
-				? Number(raw.choiceIndex)
-				: null;
-		const targetIndex = raw.targetIndex === undefined || raw.targetIndex === null || raw.targetIndex === "null"
-			? null
-			: typeof raw.targetIndex === "number" && Number.isInteger(raw.targetIndex)
-				? raw.targetIndex
-				: typeof raw.targetIndex === "string" && /^\d+$/.test(raw.targetIndex.trim())
-					? Number(raw.targetIndex)
-					: undefined;
-
-		if (choiceIndex === null || targetIndex === undefined) return null;
-
-		return { choiceIndex, targetIndex, reason: typeof raw.reason === "string" ? raw.reason.trim() : "" };
-	}
-
-	private getObjectKeys(value: unknown): string[] {
-		return value !== null && typeof value === "object" ? Object.keys(value) : [];
-	}
-
 	private createRecentChatMemory(gameChatMessages: ResponseGameChatMessage[], limit = 20): RecentChatMemoryEntry[] {
 		return gameChatMessages.slice(-limit).map((message) => ({
 			playerId: message.playerId,
@@ -1041,14 +1019,11 @@ class BotService {
 	}
 
 	private getRecentMessageTexts(recentChat: RecentChatMemoryEntry[], predicate: (message: RecentChatMemoryEntry) => boolean, limit: number): string[] {
-		return recentChat
-			.filter(predicate)
-			.map((message) => message.message.trim())
-			.filter(Boolean)
-			.slice(-limit);
+		return recentChat.filter(predicate).map((message) => message.message.trim()).filter(Boolean).slice(-limit);
 	}
 
 	private combineMessageLists(left: string[], right: string[], limit: number): string[] {
+		// Keep order while removing case-insensitive duplicates from chat and memory sources
 		const messages: string[] = [];
 		const seen = new Set<string>();
 
@@ -1068,17 +1043,13 @@ class BotService {
 
 	private getRecentDecisionMessages(memory: Record<string, unknown>, limit: number): string[] {
 		if (!Array.isArray(memory.decisionHistory)) return [];
-
-		return memory.decisionHistory
-			.map((entry) => entry as Partial<BotDecisionHistoryEntry>)
-			.map((entry) => typeof entry.message === "string" ? entry.message.trim() : "")
-			.filter(Boolean)
-			.slice(-limit);
+		return memory.decisionHistory.map((entry) => entry as Partial<BotDecisionHistoryEntry>).map((entry) => typeof entry.message === "string" ? entry.message.trim() : "").filter(Boolean).slice(-limit);
 	}
 
 	private getReservedDiscussionMessages(gameId: number, phase: PhaseType, dayNumber: number): string[] {
 		const key = this.createDiscussionMessageKey(gameId, phase, dayNumber);
 
+		// Pruning on read keeps the map small without requiring a background timer
 		this.pruneReservedDiscussionMessages(gameId, key, Date.now());
 
 		return [...(this.recentDiscussionMessagesByPhase.get(key)?.messages ?? [])];
@@ -1090,10 +1061,9 @@ class BotService {
 		const messages = this.recentDiscussionMessagesByPhase.get(key)?.messages ?? [];
 
 		messages.push(message);
-		this.recentDiscussionMessagesByPhase.set(key, {
-			messages: messages.slice(-MAX_RESERVED_DISCUSSION_MESSAGES),
-			updatedAt: now
-		});
+		this.recentDiscussionMessagesByPhase.set(key, { messages: messages.slice(-MAX_RESERVED_DISCUSSION_MESSAGES), updatedAt: now });
+
+		// Reserving generated lines immediately helps parallel bots avoid identical fallback text
 		this.pruneReservedDiscussionMessages(gameId, key, now);
 	}
 
@@ -1121,55 +1091,6 @@ class BotService {
 		}
 	}
 
-	private createNonRepeatingDiscussionFallback(phase: PhaseType, dayNumber: number, playerId: number, recentMessages: string[]): string | null {
-		const candidates = this.getDiscussionFallbackCandidates(phase, dayNumber);
-		const startIndex = candidates.length === 0 ? 0 : playerId % candidates.length;
-
-		for (let offset = 0; offset < candidates.length; offset++) {
-			const candidate = candidates[(startIndex + offset) % candidates.length];
-			const isRepeated = recentMessages.some((recentMessage) => this.areMessagesTooSimilar(recentMessage, candidate));
-
-			if (!isRepeated) {
-				return candidate;
-			}
-		}
-
-		return null;
-	}
-
-	private getDiscussionFallbackCandidates(phase: PhaseType, dayNumber: number): string[] {
-		if (dayNumber === 1 && phase === "day") {
-			return [
-				"I'll hold names until something real shows up.",
-				"Hello everyone, how are you all this fine day?",
-				"First daylight, Let's just get a read on the table.",
-				"No case from me yet. Let's wait for real evidence.",
-				"Good luck tonight everyone, may the odds be ever in your favour.",
-				"Let's see what happens."
-			];
-		}
-
-		if (phase === "voting") {
-			return [
-				"I'm not sold enough to push a vote.",
-				"I'd rather skip than make a random guess.",
-				"Case is too thin for my vote.",
-				"I need a contradiction, not just a hunch.",
-				"I don't have a clean vote here.",
-				"Unless someone has proof, I'm leaning skip."
-			];
-		}
-
-		return [
-            "I want evidence before naming someone.",
-			"Any result claims we can actually compare?",
-			"Let's keep this tied to results, not noise.",
-			"I want a real link before I point.",
-			"Nothing firm enough from my side yet.",
-			"If someone has something, now would be a good time to say it."
-		];
-	}
-
 	private areMessagesTooSimilar(left: string, right: string): boolean {
 		const leftWords = this.normalizeDiscussionMessage(left);
 		const rightWords = this.normalizeDiscussionMessage(right);
@@ -1178,6 +1099,7 @@ class BotService {
 		if (leftWords.join(" ") === rightWords.join(" ")) return true;
 		if (Math.min(leftWords.length, rightWords.length) < 4) return false;
 
+		// The heuristic combines word overlap with adjacent-word overlap to catch near-repeats
 		const leftText = leftWords.join(" ");
 		const rightText = rightWords.join(" ");
 
@@ -1201,8 +1123,21 @@ class BotService {
 		return wordSimilarity >= 0.5 && phraseSimilarity >= 0.5;
 	}
 
-	private normalizeDiscussionMessage(message: string): string[] {
-		return message.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((word) => word.length > 2);
+	private createNonRepeatingDiscussionFallback(phase: PhaseType, dayNumber: number, playerId: number, recentMessages: string[]): string | null {
+		const candidates = this.getDiscussionFallbackCandidates(phase, dayNumber);
+		// Player-based offset spreads fallback lines across bots in the same phase
+		const startIndex = candidates.length === 0 ? 0 : playerId % candidates.length;
+
+		for (let offset = 0; offset < candidates.length; offset++) {
+			const candidate = candidates[(startIndex + offset) % candidates.length];
+			const isRepeated = recentMessages.some((recentMessage) => this.areMessagesTooSimilar(recentMessage, candidate));
+
+			if (!isRepeated) {
+				return candidate;
+			}
+		}
+
+		return null;
 	}
 
 	private calculatePhraseSimilarity(leftWords: string[], rightWords: string[]): number {
@@ -1232,6 +1167,93 @@ class BotService {
 		return pairs;
 	}
 
+	private readChoiceResult(result: unknown): BotChoiceResult | null {
+		// Ollama sometimes returns numeric values as strings, so numeric strings are accepted
+		if (result === null || typeof result !== "object") return null;
+
+		const raw = result as { choiceIndex?: unknown; targetIndex?: unknown; reason?: unknown };
+		const choiceIndex = typeof raw.choiceIndex === "number" && Number.isInteger(raw.choiceIndex) ? raw.choiceIndex : typeof raw.choiceIndex === "string" && /^\d+$/.test(raw.choiceIndex.trim()) ? Number(raw.choiceIndex) : null;
+		const targetIndex = raw.targetIndex === undefined || raw.targetIndex === null || raw.targetIndex === "null" ? null : typeof raw.targetIndex === "number" && Number.isInteger(raw.targetIndex) ? raw.targetIndex : typeof raw.targetIndex === "string" && /^\d+$/.test(raw.targetIndex.trim()) ? Number(raw.targetIndex) : undefined;
+		if (choiceIndex === null || targetIndex === undefined) return null;
+
+		return { choiceIndex, targetIndex, reason: typeof raw.reason === "string" ? raw.reason.trim() : "" };
+	}
+
+	// Discussion fallback
+	private getDiscussionFallbackCandidates(phase: PhaseType, dayNumber: number): string[] {
+		if (dayNumber === 1 && phase === "day") {
+			return [
+				"I'll hold names until something real shows up.",
+				"Hello everyone, how are you all this fine day?",
+				"First daylight, Let's just get a read on the table.",
+				"No case from me yet. Let's wait for real evidence.",
+				"Good luck tonight everyone, may the odds be ever in your favour.",
+				"Let's see what happens."
+			];
+		}
+
+		if (phase === "voting") {
+			return [
+				"I'm not sold enough to push a vote.",
+				"I'd rather skip than make a random guess.",
+				"Case is too thin for my vote.",
+				"I need a contradiction, not just a hunch.",
+				"I don't have a clean vote here.",
+				"Unless someone has proof, I'm leaning skip."
+			];
+		}
+
+		return [
+			"I want evidence before naming someone.",
+			"Any result claims we can actually compare?",
+			"Let's keep this tied to results, not noise.",
+			"I want a real link before I point.",
+			"Nothing firm enough from my side yet.",
+			"If someone has something, now would be a good time to say it."
+		];
+	}
+
+	// Helpers
+	private normalizeOllamaChatUrl(url: string): string {
+		const cleanUrl = url.replace(/\/+$/, "");
+		return cleanUrl.endsWith("/api/chat") ? cleanUrl : `${cleanUrl}/api/chat`;
+	}
+
+	private readStringList(value: unknown, fallback: string[]): string[] {
+		if (!Array.isArray(value)) return fallback;
+
+		const items = value
+			.filter((item): item is string => typeof item === "string")
+			.map((item) => item.trim())
+			.filter(Boolean);
+
+		return items.length > 0 ? items : fallback;
+	}
+
+	private readRateLevel(value: unknown, fallback: RateLevel): RateLevel {
+		return botRateLevels.includes(value as RateLevel) ? value as RateLevel : fallback;
+	}
+
+	private readRiskLevel(value: unknown, fallback: RiskLevel): RiskLevel {
+		return botRiskLevels.includes(value as RiskLevel) ? value as RiskLevel : fallback;
+	}
+
+	private rollChance(chance: number): boolean {
+		return Math.random() < this.clampChance(chance);
+	}
+
+	private clampChance(chance: number): number {
+		return Math.max(0, Math.min(1, chance));
+	}
+
+	private normalizeDiscussionMessage(message: string): string[] {
+		return message.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((word) => word.length > 2);
+	}
+
+	private getObjectKeys(value: unknown): string[] {
+		return value !== null && typeof value === "object" ? Object.keys(value) : [];
+	}
+
 	private ensureMemoryObject(memoryJson: unknown, gameId: number, playerId: number): Record<string, unknown> {
 		if (memoryJson !== null && typeof memoryJson === "object" && !Array.isArray(memoryJson)) {
 			return { ...(memoryJson as Record<string, unknown>) };
@@ -1241,7 +1263,7 @@ class BotService {
 	}
 
 	private logBotFailure(message: string, details?: Record<string, unknown>): void {
-		if (process.env.NODE_ENV === "production") return;
+		if (process.env.NODE_ENV !== "development") return;
 		console.error(message, details);
 	}
 }

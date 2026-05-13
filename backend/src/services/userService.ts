@@ -1,5 +1,5 @@
 import { UserModel } from "../repositories/userRepository";
-import { ResponseUser, responseUserSchema, PatchUser } from "../types/entities/user";
+import { ResponseMeUser, responseMeUserSchema, PatchUser } from "../types/entities/user";
 import { PlayerModel } from "../repositories/playerRepository";
 import { validateIcon } from "../utils/validation";
 import { ErrorCode } from "../types";
@@ -7,13 +7,13 @@ import { AppError } from "../types/index";
 import crypto from "crypto";
 
 class UserService {
-	async getMe(userId: number): Promise<ResponseUser> {
+	async getMe(userId: number): Promise<ResponseMeUser> {
 		const user = await UserModel.findById(userId);
 		const player = await PlayerModel.findByUserId(userId);
 		if (!user || !player){
 			throw new AppError(ErrorCode.USER_NOT_FOUND);
 		}
-		return responseUserSchema.parse({ ...user, player });
+		return responseMeUserSchema.parse({ ...user, player });
 	}
 
 	async patchUser(data: PatchUser): Promise<void> {

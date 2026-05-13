@@ -8,7 +8,7 @@ export class WSGameSessionManager extends WSBaseSessionManager<InGameSession> {
 	private readonly botActionMinimumRemainingMs = 10_000;
 	private readonly botDiscussionMinimumRemainingMs = 5_000;
 	private readonly botDiscussionMinimumDelayMs = 1_000;
-	private readonly botDiscussionMaximumDelayMs = 10_000;
+	private readonly botDiscussionMaximumDelayMs = 5_000;
 	private readonly botDiscussionTalkChance = 0.5;
 	private readonly botVotingDiscussionTalkChance = 0.2;
 

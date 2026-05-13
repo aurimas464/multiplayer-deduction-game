@@ -537,7 +537,6 @@ export class WSGameHandler {
 
 				this.broadcastToGame(gameId, { type: "GAME_STARTED", gameId, gameCode: lobby.gameCode });
 				this.broadcastToGame(gameId, { type: "GAME_CHAT_MESSAGE", data: startChatMessage });
-				this.broadcastGameState(gameId);
 			});
 		});
 	}

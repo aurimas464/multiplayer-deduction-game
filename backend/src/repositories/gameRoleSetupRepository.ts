@@ -13,7 +13,7 @@ class Model {
 		};
 	}
 
-	public async upsert(data: CreateGameRoleSetup): Promise<void> {
+	async upsert(data: CreateGameRoleSetup): Promise<void> {
 		await this.db.gameRoleSetup.upsert({
 			where: {
 				gameId_roleId: {
@@ -32,7 +32,7 @@ class Model {
 		});
 	}
 
-	public async findByGameId(gameId: number): Promise<GameRoleSetup[]> {
+	async findByGameId(gameId: number): Promise<GameRoleSetup[]> {
 		const rows = await this.db.gameRoleSetup.findMany({
 			where: { gameId }
 		});

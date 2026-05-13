@@ -30,11 +30,33 @@ export type BotProfile = {
 		nightRisk: RiskLevel; 
 		targetPriority: string[]; 
 	};
-	behavior: string[];
-	strategyHints: string[];
 };
 
-// Memory structure with ruleset attached
+// Action plan is computed by the server so the model receives a concrete decision style, not raw settings
+export type BotActionPlan = {
+	riskLevel: RiskLevel;
+	riskChance: number;
+	shouldTakeRisk: boolean;
+	targetPriority: string[];
+};
+
+// Runtime discussion context used to adjust profile rates before prompting the model
+export type BotDiscussionPlanContext = {
+	phase: PhaseType;
+	dayNumber: number;
+	hasRecentFindings: boolean;
+	hasMentionedQuestion: boolean;
+	hasRecentClaims: boolean;
+};
+
+// Discussion plans tell the model what behavior is expected for this message attempt
+export type BotDiscussionPlans = {
+	deceptionPlan: { deceptionRate: RateLevel; deceptionChance: number; shouldDeceive: boolean };
+	chatterPlan: { chatterRate: RateLevel; chatterChance: number; shouldChatter: boolean };
+	accusationPlan: { accusationRate: RateLevel; accusationChance: number; shouldAccuse: boolean };
+	claimPlan: { claimRate: RateLevel; claimChance: number; shouldClaim: boolean };
+};
+
 export type BotGameMemory = {
 	gameId: number;
 	playerId: number;
@@ -70,12 +92,10 @@ export type BotDecisionHistoryEntry = {
 	reason: string;
 };
 
-// Patch for creating internal profile
+// Patch applied from difficulty, playstyle, and alignment.
 export type BotProfilePatch = {
 	talkStyle?: Partial<BotProfile["talkStyle"]>;
 	actionStyle?: Partial<Pick<BotProfile["actionStyle"], "voteRisk" | "nightRisk">> & { targetPriority?: string[] };
-	behavior?: string[];
-	strategyHints?: string[];
 };
 
 // Options for chat bot configs
@@ -110,6 +130,7 @@ export type RecentChatMemoryEntry = {
 	dayNumber: number;
 	phase: PhaseType;
 };
+
 export type ReservedDiscussionMessages = {
 	messages: string[];
 	updatedAt: number;

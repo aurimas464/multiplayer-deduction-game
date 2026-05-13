@@ -54,18 +54,18 @@ class Model {
 		return row ? this.mapGameBotSetup(row) : null;
 	}
 
-	async changeMemoryJson(gameId: number, playerId: number, memoryJson: unknown): Promise<void> {
-		await this.db.gameBotSetup.update({
+	async changeMemoryJson(gameId: number, playerId: number, memoryJson: unknown): Promise<boolean> {
+		const result = await this.db.gameBotSetup.updateMany({
 			where: {
-				gameId_playerId: {
-					gameId,
-					playerId
-				}
+				gameId,
+				playerId
 			},
 			data: {
 				memoryJson: memoryJson === null ? Prisma.JsonNull : (memoryJson as Prisma.InputJsonValue)
 			}
 		});
+
+		return result.count > 0;
 	}
 
 	async patch(patch: PatchGameBotSetup): Promise<void> {

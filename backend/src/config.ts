@@ -1,9 +1,13 @@
 import dotenv from "dotenv";
 import { AppConfig } from "./types/config";
 
-dotenv.config();
+if (process.env.NODE_ENV === "test") {
+	dotenv.config({ path: ".env.test", quiet: true });
+}
 
-const databaseUrl = process.env.DATABASE_URL;
+dotenv.config({ quiet: true });
+
+const databaseUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!databaseUrl) {
 	throw new Error("No DATABASE_URL environment variable found");

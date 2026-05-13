@@ -524,7 +524,7 @@
 
 .player-selection-name {
 	width: 100%;
-	max-width: 110px;
+	max-width: 150px;
 	font-size: 1rem;
 	font-weight: 600;
 	color: var(--accent-primary-light);

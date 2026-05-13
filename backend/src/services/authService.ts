@@ -11,10 +11,10 @@ import { SessionModel } from "../repositories/sessionRepository";
 import { PlayerModel } from "../repositories/playerRepository";
 
 import { AppError, ErrorCode } from "../types";
-import { User, CreateUser, ResponseUser, responseUserSchema } from "../types/entities/user";
+import { User, CreateUser, ResponseMeUser, responseMeUserSchema } from "../types/entities/user";
 
 class AuthService {
-	async register(data: CreateUser): Promise<ResponseUser> {
+	async register(data: CreateUser): Promise<ResponseMeUser> {
 		const existingUser = await UserModel.findByUsername(data.username);
 		if (existingUser) throw new AppError(ErrorCode.VALUE_EXISTS, [{ field: "username", code: ErrorCode.VALUE_EXISTS }]);
 
@@ -26,11 +26,11 @@ class AuthService {
 		return prisma.$transaction(async (tx) => {
 			const userModel = UserModelTransaction(tx);
 			const created = await userModel.create({ ...data, password: hashedPassword });
-			return responseUserSchema.parse(created);
+			return responseMeUserSchema.parse(created);
 		});
 	}
 
-	async login(login: string, password: string) : Promise<{ accessToken: string; refreshToken: string; userData: ResponseUser }> {
+	async login(login: string, password: string) : Promise<{ accessToken: string; refreshToken: string; userData: ResponseMeUser }> {
 		const user = await UserModel.findByEmailOrName(login);
 		if (!user) throw new AppError(ErrorCode.INVALID_CREDENTIALS);
 
@@ -51,7 +51,7 @@ class AuthService {
 		if (!session) throw new AppError(ErrorCode.INTERNAL_ERROR);
 
 		const accessToken = this.createAccessToken(user, player.id);
-		const userData = responseUserSchema.parse({ ...user, player });
+		const userData = responseMeUserSchema.parse({ ...user, player });
 
 		return { accessToken, refreshToken: rawRefreshToken, userData };
 	}

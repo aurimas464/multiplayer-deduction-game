@@ -88,7 +88,6 @@ async function startServer(): Promise<void> {
 	}
 }
 
-// Prisma shutdown handler
 let isShuttingDown = false;
 async function shutdown(): Promise<void> {
 	if (isShuttingDown) return;
@@ -112,24 +111,26 @@ async function shutdown(): Promise<void> {
 	}
 }
 
-process.on("SIGINT", () => {
-	void shutdown();
-});
+if (process.env.NODE_ENV !== "test") {
+	process.on("SIGINT", () => {
+		void shutdown();
+	});
 
-process.on("SIGTERM", () => {
-	void shutdown();
-});
+	process.on("SIGTERM", () => {
+		void shutdown();
+	});
 
-// Unhandled rejection handler
-process.on("unhandledRejection", (error) => {
-	console.error("Unhandled rejection:", error);
-	process.exit(1);
-});
+	process.on("unhandledRejection", (error) => {
+		console.error("Unhandled rejection:", error);
+		process.exit(1);
+	});
 
-// Uncaught exception handler
-process.on("uncaughtException", (error) => {
-	console.error("Uncaught exception:", error);
-	process.exit(1);
-});
+	process.on("uncaughtException", (error) => {
+		console.error("Uncaught exception:", error);
+		process.exit(1);
+	});
 
-startServer();
+	void startServer();
+}
+
+export { app, server, wss };

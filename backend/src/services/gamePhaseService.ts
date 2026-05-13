@@ -4,7 +4,7 @@ import type { Role } from "../types/entities/role";
 
 class GamePhaseService {
 	// Resolves one phase and mutates player states/roles directly
-	public resolvePhase(phase: PhaseType, pendingActions: Map<number, PlayerAction>, playerStates: Map<number, PlayerState>, playerRoles: Map<number, Role>, tieBehavior: TieBehavior)
+	resolvePhase(phase: PhaseType, pendingActions: Map<number, PlayerAction>, playerStates: Map<number, PlayerState>, playerRoles: Map<number, Role>, tieBehavior: TieBehavior)
 	: { playerStates: Map<number, PlayerState>, phaseResult: PhaseResult, personalResults: Map<number, PersonalPhaseResult[]>, winner: FinishedGameWinner | null } {
 		const phaseResult: PhaseResult = {};
 		const personalResults = new Map<number, PersonalPhaseResult[]>();
