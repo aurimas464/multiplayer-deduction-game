@@ -22,12 +22,14 @@ const friendshipTx = {
 	unblock: vi.fn()
 };
 
+// Mock database
 vi.mock("../../../prisma/client", () => ({
 	default: {
 		$transaction: vi.fn((callback) => callback({}))
 	}
 }));
 
+// Mock repositories
 vi.mock("../../../src/repositories/userRepository", () => ({
 	UserModel: {
 		findByIds: vi.fn(),
@@ -52,6 +54,7 @@ vi.mock("../../../src/repositories/friendshipRepository", () => ({
 import { FriendshipModel } from "../../../src/repositories/friendshipRepository";
 import { UserModel } from "../../../src/repositories/userRepository";
 
+// Test data
 const friendship = (overrides: Partial<Friendship> = {}): Friendship => ({
 	id: 1,
 	userId1: 1,
@@ -90,6 +93,20 @@ describe("friendshipService", () => {
 		await expect(friendshipService.getBlockedUsers(1, { offset: 0, limit: 10 })).resolves.toMatchObject({ total: 1, data: [{ id: 2 }] });
 	});
 
+	it("Tuštiems draugų sąrašams nebekviečia naudotojų paieškos", async () => {
+		vi.mocked(FriendshipModel.findAcceptedFriendships).mockResolvedValue([]);
+		vi.mocked(FriendshipModel.findPendingFriendships).mockResolvedValue([]);
+		vi.mocked(FriendshipModel.findSentFriendships).mockResolvedValue([]);
+		vi.mocked(FriendshipModel.findBlockedFriendships).mockResolvedValue([]);
+		vi.mocked(FriendshipModel.countBlockedFriendships).mockResolvedValue(0);
+
+		await expect(friendshipService.getFriends(1)).resolves.toEqual([]);
+		await expect(friendshipService.getPendingRequests(1)).resolves.toEqual([]);
+		await expect(friendshipService.getSentRequests(1)).resolves.toEqual([]);
+		await expect(friendshipService.getBlockedUsers(1, { offset: 0, limit: 10 })).resolves.toEqual({ data: [], total: 0, offset: 0, limit: 10 });
+		expect(UserModel.findByIds).not.toHaveBeenCalled();
+	});
+
 	it("Po limitų patikrinimo išsiunčia naują draugystės prašymą", async () => {
 		await expect(friendshipService.sendFriendRequest(1, "Friend")).resolves.toMatchObject({
 			targetUser: { id: 2, username: "Friend" }
@@ -109,6 +126,15 @@ describe("friendshipService", () => {
 		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.FRIEND_REQUEST_OUTGOING_LIMIT_REACHED });
 	});
 
+	it("Atmeta draugystės prašymus, kai viršijami draugų arba gaunamų prašymų limitai", async () => {
+		friendshipTx.countAcceptedFriendships.mockResolvedValueOnce(100).mockResolvedValueOnce(0);
+		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.FRIENDS_LIMIT_REACHED });
+
+		friendshipTx.countAcceptedFriendships.mockResolvedValue(0);
+		friendshipTx.countPendingFriendships.mockResolvedValueOnce(10);
+		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.FRIEND_REQUEST_INCOMING_LIMIT_REACHED });
+	});
+
 	it("Siunčiant draugystės prašymą apdoroja esamas draugystės būsenas", async () => {
 		friendshipTx.findByUsers.mockResolvedValueOnce(friendship({ status: "accepted" }));
 		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.FRIENDSHIP_ALREADY_EXISTS });
@@ -121,6 +147,13 @@ describe("friendshipService", () => {
 
 		friendshipTx.findByUsers.mockResolvedValueOnce(friendship({ status: "blocked", blockedBy: 2 }));
 		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.USER_BLOCKED });
+
+		friendshipTx.findByUsers.mockResolvedValueOnce(friendship({ status: "blocked", blockedBy: 1 }));
+		await expect(friendshipService.sendFriendRequest(1, "Friend")).rejects.toMatchObject({ code: ErrorCode.INVALID_REQUEST });
+
+		friendshipTx.findByUsers.mockResolvedValueOnce(friendship({ status: "removed" }));
+		await expect(friendshipService.sendFriendRequest(1, "Friend")).resolves.toMatchObject({ targetUser: { id: 2 } });
+		expect(friendshipTx.reRequest).toHaveBeenCalledWith(1, 1);
 	});
 
 	it("Priima, atmeta, pašalina, atšaukia ir atblokuoja tik tinkamus ryšius", async () => {
@@ -156,5 +189,17 @@ describe("friendshipService", () => {
 			friendship({ status: "accepted", userId1: 3, userId2: 1 })
 		]);
 		await expect(friendshipService.getAcceptedFriendIds(1)).resolves.toEqual(new Set([2, 3]));
+	});
+
+	it("Tikrina draugų limitą priimant prašymą ir naudotojo paiešką pagal id", async () => {
+		friendshipTx.findByUsers.mockResolvedValue(friendship({ status: "pending", requestedBy: 2 }));
+		friendshipTx.countAcceptedFriendships.mockResolvedValueOnce(100).mockResolvedValueOnce(0);
+		await expect(friendshipService.acceptFriendRequest(1, 2)).rejects.toMatchObject({ code: ErrorCode.FRIENDS_LIMIT_REACHED });
+
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(makeUserWithPlayer({ id: 2 }));
+		await expect(friendshipService.getUserById(2)).resolves.toMatchObject({ id: 2 });
+
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(null);
+		await expect(friendshipService.getUserById(99)).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FOUND });
 	});
 });

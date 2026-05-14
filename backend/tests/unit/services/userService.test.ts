@@ -3,6 +3,7 @@ import userService from "../../../src/services/userService";
 import { ErrorCode } from "../../../src/types";
 import { makePlayer, makeUserWithPlayer } from "./factories";
 
+// Mock repositories
 vi.mock("../../../src/repositories/userRepository", () => ({
 	UserModel: {
 		findById: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("../../../src/repositories/playerRepository", () => ({
 	}
 }));
 
+// Mock utilities
 vi.mock("../../../src/utils/validation", () => ({
 	validateIcon: vi.fn()
 }));
@@ -54,6 +56,13 @@ describe("userService", () => {
 		await expect(userService.getMe(1)).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FOUND });
 	});
 
+	it("Grąžina klaidą, kai naudotojas egzistuoja, bet žaidėjo įrašo nėra", async () => {
+		vi.mocked(UserModel.findById).mockResolvedValue(makeUserWithPlayer());
+		vi.mocked(PlayerModel.findByUserId).mockResolvedValue(null);
+
+		await expect(userService.getMe(1)).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FOUND });
+	});
+
 	it("Prieš atnaujinimą patikrina ir sumaišo ikonos duomenis", async () => {
 		vi.mocked(validateIcon).mockResolvedValue({ ok: true, value: "  icon-data  " });
 
@@ -71,6 +80,20 @@ describe("userService", () => {
 
 		await expect(userService.patchUser({ id: 1, icon: "bad" })).rejects.toMatchObject({ code: ErrorCode.INVALID_ICON });
 		expect(UserModel.patch).not.toHaveBeenCalled();
+	});
+
+	it("Atnaujina naudotojo laukus nekviesdamas ikonos validavimo, kai ikona nepateikta", async () => {
+		await userService.patchUser({ id: 1, theme: "light", language: "lt" });
+
+		expect(validateIcon).not.toHaveBeenCalled();
+		expect(UserModel.patch).toHaveBeenCalledWith({ id: 1, theme: "light", language: "lt", iconEtag: undefined });
+	});
+
+	it("Tuščios ikonos reikšmę perduoda nevaliduodamas jos kaip paveikslėlio", async () => {
+		await userService.patchUser({ id: 1, icon: "" });
+
+		expect(validateIcon).not.toHaveBeenCalled();
+		expect(UserModel.patch).toHaveBeenCalledWith({ id: 1, icon: "", iconEtag: undefined });
 	});
 
 	it("Didelį ikonų užklausų kiekį apriboja iki pirmų dvidešimties unikalių id", async () => {
@@ -91,5 +114,9 @@ describe("userService", () => {
 		vi.mocked(PlayerModel.findIconEtagByPlayerId).mockResolvedValue("etag");
 
 		await expect(userService.getIconEtag(10)).resolves.toBe("etag");
+	});
+
+	it("Ikonos etag skaičiavime ignoruoja kraštinius tarpus", () => {
+		expect(userService.computeIconEtag(" icon-data ")).toBe(userService.computeIconEtag("icon-data"));
 	});
 });

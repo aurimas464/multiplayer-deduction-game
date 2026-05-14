@@ -26,6 +26,7 @@ const userTx = {
 	findById: vi.fn()
 };
 
+// Test data
 const friendship = (overrides: Partial<Friendship> = {}): Friendship => ({
 	id: 5,
 	userId1: 1,
@@ -48,12 +49,14 @@ const directChat = (overrides: Partial<DirectChat> = {}): DirectChat => ({
 	...overrides
 });
 
+// Mock database
 vi.mock("../../../prisma/client", () => ({
 	default: {
 		$transaction: vi.fn((callback) => callback({}))
 	}
 }));
 
+// Mock repositories
 vi.mock("../../../src/repositories/directChatRepository", () => ({
 	DirectChatModel: {
 		findByUserIdWithDetails: vi.fn(),
@@ -138,6 +141,15 @@ describe("chatService", () => {
 		await expect(chatService.markDirectChatRead(1, 2)).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FRIEND });
 	});
 
+	it("Praleidžia perskaitymo žymėjimą, kai asmeninis pokalbis dar nesukurtas", async () => {
+		vi.mocked(FriendshipModel.findByUsers).mockResolvedValue(friendship());
+		vi.mocked(DirectChatModel.findByFriendshipId).mockResolvedValue(null);
+
+		await chatService.markDirectChatRead(1, 2);
+
+		expect(DirectChatModel.markReadByFriendshipId).not.toHaveBeenCalled();
+	});
+
 	it("Sukuria trūkstamus asmeninius pokalbius ir grąžina žinutes", async () => {
 		directChatTx.findByFriendshipId.mockResolvedValueOnce(null);
 		directChatTx.create.mockResolvedValueOnce(directChat({ id: 7 }));
@@ -162,6 +174,33 @@ describe("chatService", () => {
 
 		messageTx.findById.mockResolvedValueOnce({ id: 3, chatId: 6, senderId: 1, message: "hello", editedAt: null, deletedAt: now, createdAt: now, updatedAt: now });
 		await expect(chatService.deleteDirectMessage(1, 3)).rejects.toMatchObject({ code: ErrorCode.INVALID_REQUEST });
+	});
+
+	it("Atmeta asmeninių žinučių redagavimą, kai trūksta įrašo, pokalbio, draugystės arba siuntėjo", async () => {
+		const original = { id: 3, chatId: 6, senderId: 1, message: "hello", editedAt: null, deletedAt: null, createdAt: now, updatedAt: now };
+
+		messageTx.findById.mockResolvedValueOnce(null);
+		await expect(chatService.editDirectMessage(1, 3, "edit")).rejects.toMatchObject({ code: ErrorCode.FRIENDSHIP_NOT_FOUND });
+
+		messageTx.findById.mockResolvedValueOnce(original);
+		directChatTx.findById.mockResolvedValueOnce(null);
+		await expect(chatService.editDirectMessage(1, 3, "edit")).rejects.toMatchObject({ code: ErrorCode.FRIENDSHIP_NOT_FOUND });
+
+		messageTx.findById.mockResolvedValueOnce(original);
+		directChatTx.findById.mockResolvedValueOnce(directChat());
+		friendshipTx.findById.mockResolvedValueOnce(friendship({ status: "pending" }));
+		await expect(chatService.editDirectMessage(1, 3, "edit")).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FRIEND });
+
+		messageTx.findById.mockResolvedValueOnce(original).mockResolvedValueOnce(null);
+		directChatTx.findById.mockResolvedValueOnce(directChat());
+		friendshipTx.findById.mockResolvedValueOnce(friendship());
+		await expect(chatService.editDirectMessage(1, 3, "edit")).rejects.toMatchObject({ code: ErrorCode.INTERNAL_ERROR });
+
+		messageTx.findById.mockResolvedValueOnce(original).mockResolvedValueOnce({ ...original, message: "edit" });
+		directChatTx.findById.mockResolvedValueOnce(directChat());
+		friendshipTx.findById.mockResolvedValueOnce(friendship());
+		userTx.findById.mockResolvedValueOnce(null);
+		await expect(chatService.editDirectMessage(1, 3, "edit")).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FOUND });
 	});
 
 	it("Redaguoja ir ištrina savo asmenines žinutes, kai draugystė vis dar patvirtinta", async () => {
@@ -202,6 +241,10 @@ describe("chatService", () => {
 
 		await expect(chatService.getGameChatMessages(1, 1, { offset: 0, limit: 10 })).resolves.toMatchObject({ total: 1, data: [{ message: "hello" }] });
 
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(null);
+		await expect(chatService.getGameChatMessages(1, 1, { offset: 0, limit: 10 })).rejects.toMatchObject({ code: ErrorCode.USER_NOT_FOUND });
+
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(makeUserWithPlayer({ player: { id: 10, iconEtag: "etag" } }));
 		vi.mocked(ParticipantModel.findByGameIdAndPlayerId).mockResolvedValueOnce(null);
 		await expect(chatService.getGameChatMessages(1, 1, { offset: 0, limit: 10 })).rejects.toMatchObject({ code: ErrorCode.UNAUTHORIZED });
 	});

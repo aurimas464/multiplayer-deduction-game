@@ -57,7 +57,7 @@ export const lt = {
 			noData: "Duomenų nėra",
 			never: "Niekada",
 			updatedAt: "Atnaujinta {date}",
-			lastRefresh: "Paskutinis rankinis atnaujinimas {date}",
+			lastRefresh: "Paskutinis rankinis atnaujinimas: {date}",
 			sections: {
 				totals: "Bendrai",
 				publicResults: "Visų žaidėjų rezultatai",

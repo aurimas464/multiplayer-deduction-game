@@ -16,10 +16,7 @@ const Login = () => {
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target;
-		setFormData(prev => ({
-			...prev,
-			[name]: value,
-		}));
+		setFormData(prev => ({ ...prev, [name]: value }));
 	};
 
 	const navigate = useNavigate();
@@ -32,6 +29,7 @@ const Login = () => {
 	const [successMessage, setSuccessMessage] = useState<string>("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
+	// With error mapper
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 
@@ -61,6 +59,7 @@ const Login = () => {
 		setError(prevErrorMessage => (prevErrorMessage === newErrorMessage ? prevErrorMessage : newErrorMessage));
 	};
 
+	// Set message when coming from registration
 	useEffect(() => {
 		const state = location.state as { fromRegister?: boolean } | null;
 

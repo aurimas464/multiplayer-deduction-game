@@ -144,7 +144,7 @@ class Model {
 	}
 
 	async completeGame(gameId: number, winnerAlignment: RoleAlignment): Promise<void> {
-		await this.db.game.update({
+		await this.db.game.updateMany({
 			where: { id: gameId },
 			data: {
 				status: "finished",

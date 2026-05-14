@@ -57,7 +57,7 @@ export const en = {
 			noData: "No data",
 			never: "Never",
 			updatedAt: "Updated {date}",
-			lastRefresh: "Last manual refresh {date}",
+			lastRefresh: "Last manual refresh: {date}",
 			sections: {
 				totals: "Totals",
 				publicResults: "All Player Results",

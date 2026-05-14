@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import botService from "../../../src/services/botService";
 import { makeGameMessage, makeGameStatePlayer, makeLobbyPlayer, makeRole } from "./factories";
 
+// Mock repositories
 vi.mock("../../../src/repositories/botRepository", () => ({
 	BotModel: {
 		findBotPlayerById: vi.fn()
@@ -20,6 +21,7 @@ vi.mock("../../../src/repositories/gameBotSetupRepository", () => ({
 import { BotModel } from "../../../src/repositories/botRepository";
 import { GameBotSetupModel } from "../../../src/repositories/gameBotSetupRepository";
 
+// Test data
 const memory = {
 	gameId: 1,
 	playerId: 10,
@@ -36,6 +38,7 @@ const memory = {
 	decisionHistory: []
 };
 
+// Test helpers
 const mockFetchJson = (content: string) => {
 	vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
 		ok: true,

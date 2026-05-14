@@ -19,12 +19,14 @@ const actionTx = {
 	create: vi.fn()
 };
 
+// Mock database
 vi.mock("../../../prisma/client", () => ({
 	default: {
 		$transaction: vi.fn((callback) => callback({}))
 	}
 }));
 
+// Mock repositories
 vi.mock("../../../src/repositories/gameRepository", () => ({
 	GameModel: {
 		create: vi.fn(),
@@ -63,6 +65,7 @@ vi.mock("../../../src/repositories/botRepository", () => ({
 	}
 }));
 
+// Mock services
 vi.mock("../../../src/services/gameLobbyService", () => ({
 	default: {
 		claimSeat: vi.fn()
@@ -98,6 +101,13 @@ describe("gameService", () => {
 		expect(GameModel.create).toHaveBeenCalledTimes(2);
 	});
 
+	it("Kuriant žaidimą nepaslepia netikėtų repozitorijos klaidų", async () => {
+		const failure = new Error("database unavailable");
+		vi.mocked(GameModel.create).mockRejectedValueOnce(failure);
+
+		await expect(gameService.createGame()).rejects.toBe(failure);
+	});
+
 	it("Nepavykus išvengti pasikartojančių kodo sutapimų nesukuria žaidimo", async () => {
 		vi.mocked(GameModel.create).mockRejectedValue({ code: "P2002" });
 
@@ -115,6 +125,17 @@ describe("gameService", () => {
 		await expect(gameService.joinGame(10, 1)).rejects.toMatchObject({ code: ErrorCode.GAME_NOT_IN_LOBBY });
 	});
 
+	it("Prisijungiant grąžina esamą dalyvį ir atmeta neegzistuojantį žaidimą", async () => {
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(makeGame());
+		vi.mocked(ParticipantModel.findByGameIdAndPlayerId).mockResolvedValueOnce(makeParticipant({ playerId: 10, seatNr: 3 }));
+
+		await expect(gameService.joinGame(10, 1)).resolves.toMatchObject({ playerId: 10, seatNr: 3 });
+		expect(gameLobbyService.claimSeat).not.toHaveBeenCalled();
+
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(null);
+		await expect(gameService.joinGame(10, 1)).rejects.toMatchObject({ code: ErrorCode.GAME_NOT_FOUND });
+	});
+
 	it("Prideda botą tik tada, kai lyderis yra pirmoje vietoje ir yra laisvas boto žaidėjas", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(0);
 		vi.mocked(GameModel.findByGameId).mockResolvedValue(makeGame());
@@ -126,6 +147,33 @@ describe("gameService", () => {
 
 		await expect(gameService.addBot(10, 1)).resolves.toMatchObject({ playerId: 99, seatNr: 2 });
 		expect(BotModel.getAvailableBots).toHaveBeenCalledWith([10]);
+	});
+
+	it("Atmeta boto pridėjimą, kai žaidimas netinkamas", async () => {
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(null);
+		await expect(gameService.addBot(10, 1)).rejects.toMatchObject({ code: ErrorCode.GAME_NOT_FOUND });
+
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(makeGame({ status: "in_progress" }));
+		await expect(gameService.addBot(10, 1)).rejects.toMatchObject({ code: ErrorCode.GAME_NOT_IN_LOBBY });
+	});
+
+	it("Atmeta boto pridėjimą be lyderio teisių arba laisvo boto žaidėjo", async () => {
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(makeGame());
+		vi.mocked(ParticipantModel.findByGameIdAndPlayerId).mockResolvedValueOnce(makeParticipant({ playerId: 10, seatNr: 2 }));
+		await expect(gameService.addBot(10, 1)).rejects.toMatchObject({ code: ErrorCode.NOT_GAME_LEADER });
+
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(makeGame());
+		vi.mocked(ParticipantModel.findByGameIdAndPlayerId).mockResolvedValueOnce(makeParticipant({ playerId: 10, seatNr: 1 }));
+		vi.mocked(ParticipantModel.findByGameId).mockResolvedValueOnce([makeParticipant({ playerId: 10, seatNr: 1 })]);
+		vi.mocked(BotModel.getAvailableBots).mockResolvedValueOnce([]);
+		await expect(gameService.addBot(10, 1)).rejects.toMatchObject({ code: ErrorCode.BOT_NOT_ADDED });
+
+		vi.mocked(GameModel.findByGameId).mockResolvedValueOnce(makeGame());
+		vi.mocked(ParticipantModel.findByGameIdAndPlayerId).mockResolvedValueOnce(makeParticipant({ playerId: 10, seatNr: 1 }));
+		vi.mocked(ParticipantModel.findByGameId).mockResolvedValueOnce([makeParticipant({ playerId: 10, seatNr: 1 })]);
+		vi.mocked(BotModel.getAvailableBots).mockResolvedValueOnce([{ id: 50, name: "Bot" }]);
+		vi.mocked(PlayerModel.findByBotId).mockResolvedValueOnce(null);
+		await expect(gameService.addBot(10, 1)).rejects.toMatchObject({ code: ErrorCode.BOT_NOT_ADDED });
 	});
 
 	it("Pradeda žaidimą priskirdamas tikslias roles transakcijoje gautiems dalyviams", async () => {
@@ -206,13 +254,13 @@ describe("gameService", () => {
 	});
 
 	it("Filtruoja sesijų kopijas pagal būseną ir perduoda paprastas repozitorijų operacijas", async () => {
-		const lobbySnapshot = { game: makeGame({ status: "lobby" }), participants: [], roleSettings: {}, botSettings: {} };
-		const activeSnapshot = { game: makeGame({ status: "in_progress" }), participants: [], roleSettings: {}, botSettings: {} };
+		const lobbyState = { game: makeGame({ status: "lobby" }), participants: [], roleSettings: {}, botSettings: {} };
+		const activeState = { game: makeGame({ status: "in_progress" }), participants: [], roleSettings: {}, botSettings: {} };
 
-		vi.mocked(GameModel.findSessionSnapshot).mockResolvedValueOnce(lobbySnapshot).mockResolvedValueOnce(activeSnapshot).mockResolvedValueOnce(lobbySnapshot);
+		vi.mocked(GameModel.findSessionSnapshot).mockResolvedValueOnce(lobbyState).mockResolvedValueOnce(activeState).mockResolvedValueOnce(lobbyState);
 
-		await expect(gameService.getLobbyGameSnapshot(1)).resolves.toBe(lobbySnapshot);
-		await expect(gameService.getInProgressGameSnapshot(1)).resolves.toBe(activeSnapshot);
+		await expect(gameService.getLobbyGameSnapshot(1)).resolves.toBe(lobbyState);
+		await expect(gameService.getInProgressGameSnapshot(1)).resolves.toBe(activeState);
 		await expect(gameService.getInProgressGameSnapshot(1)).resolves.toBeNull();
 
 		vi.mocked(GameModel.cancelAllNonFinishedGames).mockResolvedValue(3);

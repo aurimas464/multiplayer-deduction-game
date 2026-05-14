@@ -1,4 +1,5 @@
-import { ErrorCode } from "./index";
+import type { ErrorCodeType } from "./index";
+import type { RoleAlignment as CatalogRoleAlignment } from "./role";
 
 export const GameStatus = ["lobby", "starting", "in_progress", "finished", "cancelled"] as const;
 export const PhaseType = ["day", "voting", "night"] as const;
@@ -11,20 +12,28 @@ export const PlayerType = ["user", "bot"] as const;
 export const BotDifficulty = ["random", "easy", "normal", "hard"] as const;
 export const BotPlaystyle = ["random", "balanced", "aggressive", "passive", "deceptive", "defensive", "chaotic"] as const;
 
-type WsErrorCode = typeof ErrorCode[keyof typeof ErrorCode];
+type WsErrorCode = ErrorCodeType;
 export type PlayerActionName = typeof PlayerActionType[number];
-
-export type RoleAlignment = "vampire" | "commune" | "neutral";
+export type GameStatusType = typeof GameStatus[number];
+export type GamePhase = typeof PhaseType[number];
+export type PlayerKind = typeof PlayerType[number];
+export type BotDifficultyLevel = typeof BotDifficulty[number];
+export type BotPlaystyleType = typeof BotPlaystyle[number];
+export type TieBehaviorType = typeof TieBehavior[number];
+export type VoteCountVisibilityType = typeof VoteCountVisibility[number];
+export type RoleDistributionModeType = typeof RoleDistributionMode[number];
+export type GameChatMessageKind = typeof GameChatMessageType[number];
+export type RoleAlignment = CatalogRoleAlignment;
 
 export type RoleSettings = Record<number, number>;
 export type BotSettings = Record<number, {
-	difficulty: typeof BotDifficulty[number];
-	playstyle: typeof BotPlaystyle[number];
+	difficulty: BotDifficultyLevel;
+	playstyle: BotPlaystyleType;
 }>;
 
 export type LobbyPlayer = {
 	playerId: number;
-	type: typeof PlayerType[number];
+	type: PlayerKind;
 	username: string;
 	iconEtag: string;
 	isReady: boolean;
@@ -38,11 +47,11 @@ export type MetaSettings = {
 	daySeconds: number;
 	votingSeconds: number;
 	nightSeconds: number;
-	tieBehavior: typeof TieBehavior[number];
-	voteCountVisibility: typeof VoteCountVisibility[number];
+	tieBehavior: TieBehaviorType;
+	voteCountVisibility: VoteCountVisibilityType;
 	anonymousVoting: boolean;
 	roleRevealOnDeath: boolean;
-	roleDistributionMode: typeof RoleDistributionMode[number];
+	roleDistributionMode: RoleDistributionModeType;
 };
 
 export type LobbyStateData = {
@@ -56,7 +65,7 @@ export type LobbyStateData = {
 
 export type GameStatePlayer = {
 	playerId: number;
-	type: typeof PlayerType[number];
+	type: PlayerKind;
 	username: string;
 	iconEtag: string;
 	seatNr: number;
@@ -72,7 +81,7 @@ export type GameStateData = {
 	myRoleKey: string;
 	myIsJailed: boolean;
 	availableActions: PlayerActionName[];
-	currentPhase: typeof PhaseType[number];
+	currentPhase: GamePhase;
 	dayNumber: number;
 	phaseEndsAt: number;
 	phaseStartedAt: number;
@@ -111,8 +120,8 @@ export type GameFinishedPlayer = {
 export type GameFinishedAction = {
 	playerId: number;
 	dayNumber: number;
-	phase: typeof PhaseType[number];
-	type: typeof PlayerActionType[number];
+	phase: GamePhase;
+	type: PlayerActionName;
 	targetPlayerId: number | null;
 };
 
@@ -145,9 +154,9 @@ export type ResponseGameChatMessage = {
 	gameId: number;
 	playerId: number | null;
 	message: string;
-	messageType: typeof GameChatMessageType[number];
+	messageType: GameChatMessageKind;
 	dayNumber: number;
-	phase: typeof PhaseType[number];
+	phase: GamePhase;
 	createdAt: Date | string;
 	user: ResponseUser | null;
 	bot: ResponseBot | null;
@@ -176,11 +185,11 @@ export type ClientMessage =
 	| { type: "CHANGE_SEAT"; seatNr: number }
 	| { type: "UPDATE_LOBBY_SETTINGS"; metaSettings: Partial<MetaSettings>; roleSettings: RoleSettings }
 	| { type: "ADD_BOT" }
-	| { type: "CHANGE_BOT_SETTINGS"; botId: number; difficulty: typeof BotDifficulty[number]; playstyle: typeof BotPlaystyle[number] }
+	| { type: "CHANGE_BOT_SETTINGS"; botId: number; difficulty: BotDifficultyLevel; playstyle: BotPlaystyleType }
 	| { type: "KICK_PLAYER"; playerId: number }
 	| { type: "SET_READY"; ready: boolean }
 	| { type: "REQUEST_GAME_STATE" }
-	| { type: "PLAYER_ACTION"; action: typeof PlayerActionType[number]; targetPlayerId: number | null }
+	| { type: "PLAYER_ACTION"; action: PlayerActionName; targetPlayerId: number | null }
 	| { type: "SEND_GAME_CHAT_MESSAGE"; message: string }
 	| { type: "RECOVER_GAME" }
 	| { type: "INVITE_TO_GAME"; targetUserId: number }
@@ -222,8 +231,8 @@ export type ServerMessage =
 	| { type: "GAME_STARTED"; gameId: number; gameCode: string }
 	| { type: "GAME_STATE"; data: GameStateData }
 	| { type: "PLAYER_ACTION_OK" }
-	| { type: "PHASE_RESULTS"; resolvedPhase: typeof PhaseType[number]; dayNumber: number; result: PhaseResult }
-	| { type: "PERSONAL_PHASE_RESULTS"; resolvedPhase: typeof PhaseType[number]; dayNumber: number; result: PersonalPhaseResult[] }
+	| { type: "PHASE_RESULTS"; resolvedPhase: GamePhase; dayNumber: number; result: PhaseResult }
+	| { type: "PERSONAL_PHASE_RESULTS"; resolvedPhase: GamePhase; dayNumber: number; result: PersonalPhaseResult[] }
 	| { type: "GAME_CHAT_MESSAGE"; data: ResponseGameChatMessage }
 	| { type: "GAME_FINISHED"; result: GameFinishedResult }
 	| { type: "INVITED_TO_GAME"; username: string; gameCode: string }

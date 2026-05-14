@@ -1,7 +1,6 @@
 import type { GameChatItem, SidebarChatType } from "./chat";
 import type { Note } from "./note";
-import type { GameFinishedAction, GameFinishedPlayer, PhaseResult, PlayerActionName, RoleAlignment } from "./websocket";
-import type { RoleAlignment as CatalogRoleAlignment } from "./role";
+import type { GameFinishedAction, GameFinishedPlayer, GamePhase, PhaseResult, PlayerActionName, RoleAlignment } from "./websocket";
 
 export type PopupType =
 	| "success"
@@ -62,7 +61,7 @@ export type NotePopupPayload = {
 export type RoleRevealPopupPayload = {
 	roleKey: string;
 	roleName: string;
-	roleAlignment?: CatalogRoleAlignment | RoleAlignment | "";
+	roleAlignment?: RoleAlignment | "";
 };
 
 export type PlayerSelectionPopupPayload = {
@@ -82,7 +81,7 @@ export type PlayerSelectionPopupPayload = {
 
 export type PhaseResultsPopupPayload = {
 	dayNumber: number;
-	resolvedPhase: "day" | "voting" | "night";
+	resolvedPhase: GamePhase;
 	summary: string;
 	personal: string[];
 	eliminated: NonNullable<PhaseResult["eliminated"]>;

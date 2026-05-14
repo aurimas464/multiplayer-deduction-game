@@ -1,7 +1,7 @@
 import { AppError, ErrorCode } from "../../types";
 import type { ClientMessage } from "../../types/websocket/client";
 import type { ServerMessage } from "../../types/websocket/server";
-import type { BotSettings, ConnectedUserSocket, FinishedGameWinner, GameFinishedPlayer, GameStatePlayer, InGameDayActionHistory, LobbyPlayer, LobbySession, MetaSettings, PlayerAction, PlayerActionType, PlayerState, RoleSettings } from "../../types/websocket/types";
+import type { BotNightActionState, BotSettings, ConnectedUserSocket, FinishedGameWinner, GameFinishedPlayer, GameStatePlayer, InGameDayActionHistory, LobbyPlayer, LobbySession, MetaSettings, PlayerAction, PlayerActionType, PlayerState, RoleSettings } from "../../types/websocket/types";
 import type { CreateGameChatMessage, PhaseType, ResponseGameChatMessage } from "../../types/entities/gameChatMessage";
 
 import type { BotDifficulty, BotPlaystyle } from "../../types/entities/gameBotSetup";
@@ -740,7 +740,7 @@ export class WSGameHandler {
 		return BotService.chooseVoteAction(gameId, playerId, phaseAndDay?.dayNumber ?? 1, players, gameChatMessages, timeoutMs);
 	}
 
-	private async botNightAction(gameId: number, playerId: number, actionState: { roleKey: string | null; dayNumber: number; vampireMissedEliminationCycles: number; hasUsedConvert: boolean; chroniclerCurrentRoleKey: string | null }, players: GameStatePlayer[], gameChatMessages: ResponseGameChatMessage[], timeoutMs: number): Promise<PlayerAction> {
+	private async botNightAction(gameId: number, playerId: number, actionState: BotNightActionState, players: GameStatePlayer[], gameChatMessages: ResponseGameChatMessage[], timeoutMs: number): Promise<PlayerAction> {
 		const phaseAndDay = this.gameSessions.getPhaseAndDay(gameId);
 
 		return BotService.chooseNightAction(gameId, playerId, { ...actionState, dayNumber: phaseAndDay?.dayNumber ?? actionState.dayNumber }, players, gameChatMessages, timeoutMs);

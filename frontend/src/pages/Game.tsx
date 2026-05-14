@@ -13,7 +13,7 @@ import defaultBotIcon from "../assets/default-bot-icon.png";
 import "../css/game.css";
 import { ErrorCode } from "../types";
 import type { GameFinishedPopupPayload } from "../types/popup";
-import type { GameFinishedResult, GameStateData, PersonalPhaseResult, PhaseResult, PlayerActionName } from "../types/websocket";
+import type { GameFinishedResult, GameStateData, PersonalPhaseResult, PhaseResult, PlayerActionName, PhaseType } from "../types/websocket";
 
 type Phase = GameStateData["currentPhase"];
 

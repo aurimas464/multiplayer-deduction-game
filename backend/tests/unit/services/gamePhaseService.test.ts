@@ -6,6 +6,7 @@ import { makePlayerState, makeRole } from "./factories";
 
 type PlayerStateOverrides = Parameters<typeof makePlayerState>[0];
 
+// Test helpers
 const states = (ids: number[], overrides: Record<number, PlayerStateOverrides> = {}) =>
 	new Map(ids.map((id) => [id, makePlayerState(overrides[id])]));
 

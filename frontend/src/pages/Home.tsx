@@ -22,13 +22,12 @@ const Home = () => {
 	const { sendMessage } = useWebSocket();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const welcomeTitle = user?.username
-		? `${t("pages.home.title")}, ${user.username}!`
-		: `${t("pages.home.title")}!`;
 
+	const welcomeTitle = user?.username ? `${t("pages.home.title")}, ${user.username}!` : `${t("pages.home.title")}!`;
 	const loadingRef = useRef(false);
 	const shownFinishedKeyRef = useRef<string | null>(null);
 
+	// Show game finished popup when coming from a finished game
 	useEffect(() => {
 		const state = location.state as HomeLocationState | null;
 		const gameFinished = state?.gameFinished;
@@ -38,18 +37,16 @@ const Home = () => {
 		if (shownFinishedKeyRef.current === key) return;
 		shownFinishedKeyRef.current = key;
 
-		const popupHeight = Math.max(520, Math.min(window.innerHeight - 48, 260 + gameFinished.players.length * 30 + Math.min(gameFinished.timeline.length, 12) * 28));
-		const popupWidth = gameFinished.timeline.length > 0 ? 820 : 680;
-
 		showPopup({
 			type: "gameFinished",
 			title: t("pages.game.finished.title"),
 			payload: gameFinished,
-			width: popupWidth,
-			height: popupHeight,
+			width: 820,
+			height: 560,
 			position: "center"
 		});
 
+		// Clear state after showing popup to prevent it from showing again on refresh
 		navigate("/home", { replace: true, state: null });
 	}, [location.state, navigate, showPopup, t]);
 
@@ -64,7 +61,6 @@ const Home = () => {
 						msg.code === ErrorCode.ALREADY_IN_GAME ||
 						msg.code === ErrorCode.GAME_NOT_IN_LOBBY ||
 						msg.code === ErrorCode.GAME_FULL),
-
 				onMessage: (msg) => {
 					if (msg.type !== "CREATE_GAME_OK") return;
 					sendMessage({ type: "JOIN_GAME", gameCode: msg.gameCode });
@@ -73,7 +69,7 @@ const Home = () => {
 					if (msg.type === "JOIN_GAME_OK") {
 						navigate(`/game-lobby/${msg.gameCode}`, { replace: true });
 					}
-				},
+				}
 			},
 			loadingRef
 		);

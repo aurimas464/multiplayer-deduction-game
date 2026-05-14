@@ -13,12 +13,14 @@ const roleSetupTx = {
 	upsert: vi.fn()
 };
 
+// Mock database
 vi.mock("../../../prisma/client", () => ({
 	default: {
 		$transaction: vi.fn((callback) => callback({}))
 	}
 }));
 
+// Mock repositories
 vi.mock("../../../src/repositories/roleRepository", () => ({
 	RoleModel: {
 		listRoles: vi.fn()

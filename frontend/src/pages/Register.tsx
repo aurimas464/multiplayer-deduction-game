@@ -36,12 +36,10 @@ const Register = () => {
 
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target;
-		setFormData((prev) => ({
-			...prev,
-			[name]: value,
-		}));
+		setFormData((prev) => ({ ...prev, [name]: value }));
 	};
 
+	// With error mapper
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 

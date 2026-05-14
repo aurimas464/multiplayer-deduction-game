@@ -7,39 +7,29 @@ const userTx = {
 	create: vi.fn()
 };
 
+// Mock files
 vi.mock("../../../src/config", () => ({
-	default: {
-		jwtSecret: "test-secret",
-		cookie: { maxAgeDays: 7 }
-	}
+	default: { jwtSecret: "test-secret", cookie: { maxAgeDays: 7 } }
 }));
 
 vi.mock("../../../prisma/client", () => ({
-	default: {
-		$transaction: vi.fn((callback) => callback({}))
-	}
+	default: { $transaction: vi.fn((callback) => callback({})) }
 }));
 
+// Mock libraries
 vi.mock("bcryptjs", () => ({
-	default: {
-		hash: vi.fn(),
-		compare: vi.fn()
-	},
-	hash: vi.fn(),
-	compare: vi.fn()
+	default: { hash: vi.fn(), compare: vi.fn() }, hash: vi.fn(), compare: vi.fn()
 }));
 
 vi.mock("jsonwebtoken", () => ({
-	default: {
-		sign: vi.fn()
-	},
-	sign: vi.fn()
+	default: { sign: vi.fn() }, sign: vi.fn()
 }));
 
 vi.mock("uuid", () => ({
 	v4: vi.fn()
 }));
 
+// Mock repositories
 vi.mock("../../../src/repositories/userRepository", () => ({
 	UserModel: {
 		findByUsername: vi.fn(),
@@ -130,6 +120,15 @@ describe("authService", () => {
 		expect(SessionModel.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 1, refreshTokenHash: expect.any(String) }));
 	});
 
+	it("Atmeta tuščią prisijungimo slaptažodį nekviesdamas maišos tikrinimo", async () => {
+		const user = makeUserWithPlayer({ id: 1 });
+		vi.mocked(UserModel.findByEmailOrName).mockResolvedValue(user);
+
+		await expect(authService.login("aurimas", "")).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
+		expect(bcrypt.compare).not.toHaveBeenCalled();
+		expect(PlayerModel.findByUserId).not.toHaveBeenCalled();
+	});
+
 	it("Atmeta netinkamus prisijungimo duomenis ir trūkstamus žaidėjo įrašus", async () => {
 		vi.mocked(UserModel.findByEmailOrName).mockResolvedValueOnce(null);
 		await expect(authService.login("missing", "password")).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
@@ -160,6 +159,23 @@ describe("authService", () => {
 		vi.mocked(PlayerModel.findByUserId).mockResolvedValueOnce(user.player);
 		vi.mocked(SessionModel.rotateByTokenHash).mockResolvedValueOnce(0);
 		await expect(authService.refresh("raced")).rejects.toMatchObject({ code: ErrorCode.EXPIRED_TOKEN });
+	});
+
+	it("Atnaujinant žetoną atmeta dingusį naudotoją arba žaidėjo įrašą", async () => {
+		const session = { id: 1, userId: 1, refreshTokenHash: "hash", refreshExpiresAt: now, createdAt: now, updatedAt: now };
+		const user = makeUserWithPlayer({ id: 1, player: { id: 22, iconEtag: "etag" } });
+		vi.mocked(SessionModel.findByValidTokenHash).mockResolvedValueOnce(session);
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(null);
+
+		await expect(authService.refresh("missing-user")).rejects.toMatchObject({ code: ErrorCode.EXPIRED_TOKEN });
+		expect(SessionModel.rotateByTokenHash).not.toHaveBeenCalled();
+
+		vi.mocked(SessionModel.findByValidTokenHash).mockResolvedValueOnce(session);
+		vi.mocked(UserModel.findById).mockResolvedValueOnce(user);
+		vi.mocked(PlayerModel.findByUserId).mockResolvedValueOnce(null);
+
+		await expect(authService.refresh("missing-player")).rejects.toMatchObject({ code: ErrorCode.INTERNAL_ERROR });
+		expect(SessionModel.rotateByTokenHash).not.toHaveBeenCalled();
 	});
 
 	it("Prieš atsijungimo trynimą sumaišo atnaujinimo žetoną", async () => {

@@ -592,7 +592,7 @@ class BotService {
 			const decision = entry as Partial<BotDecisionHistoryEntry>;
 			return typeof decision.reason === "string" && decision.reason.includes("baseless_accusation");
 		});
-		const allowImperfectMessage = this.rollChance(0.18);
+		const allowImperfectMessage = this.rollChance(0.25);
 		let repeatFallbackReason: string | null = null;
 
 		// Log bad responses in development

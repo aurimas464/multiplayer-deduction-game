@@ -1,3 +1,8 @@
+import type { RoleAlignment } from "./role";
+import type { PlayerActionName, RoleDistributionModeType, TieBehaviorType, VoteCountVisibilityType } from "./websocket";
+
+export type StatisticsView = "public" | "personal";
+
 export type StatisticsSnapshot = {
 	updatedAt: number;
 	lastManualRefresh: number;
@@ -10,7 +15,7 @@ export type StatisticsSnapshot = {
 		notes: number;
 	};
 	games: {
-		victories: Array<{ alignment: string; count: number }>;
+		victories: Array<{ alignment: RoleAlignment; count: number }>;
 		player: {
 			wins: number;
 			losses: number;
@@ -18,9 +23,9 @@ export type StatisticsSnapshot = {
 			deadAtEnd: number;
 		};
 		popularGameSettings: {
-			roleDistributionMode: Array<{ value: string; count: number }>;
-			tieBehavior: Array<{ value: string; count: number }>;
-			voteCountVisibility: Array<{ value: string; count: number }>;
+			roleDistributionMode: Array<{ value: RoleDistributionModeType; count: number }>;
+			tieBehavior: Array<{ value: TieBehaviorType; count: number }>;
+			voteCountVisibility: Array<{ value: VoteCountVisibilityType; count: number }>;
 			anonymousVoting: Array<{ value: boolean; count: number }>;
 			roleRevealOnDeath: Array<{ value: boolean; count: number }>;
 		};
@@ -38,7 +43,7 @@ export type StatisticsSnapshot = {
 			};
 		};
 		topRoles: Array<{ roleKey: string; count: number }>;
-		topActions: Array<{ actionKey: string; count: number }>;
+		topActions: Array<{ actionKey: PlayerActionName; count: number }>;
 	};
 	activity: {
 		last24h: {
