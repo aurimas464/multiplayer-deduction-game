@@ -6,7 +6,7 @@ import { useWebSocket } from "../contexts/WebSocketContext";
 import { useWebSocketNotifyWithLoading } from "../hooks/useWebSocketNotifyWithLoading";
 import "../css/GameLobby.css";
 import { ErrorCode } from "../types";
-import { BotDifficulty, BotPlaystyle, RoleDistributionMode, TieBehavior, VoteCountVisibility, type LobbyStateData, type MetaSettings } from "../types/websocket";
+import { BotDifficulty, BotPlaystyle, RoleDistributionMode, TieBehavior, VoteCountVisibility, type BotDifficultyLevel, type BotPlaystyleType, type BotSettings, type LobbyPlayer, type LobbyStateData, type MetaSettings, type RoleAlignment, type RoleDistributionModeType, type TieBehaviorType, type VoteCountVisibilityType } from "../types/websocket";
 import defaultIcon from "../assets/default-user-icon.png";
 import defaultBotIcon from "../assets/default-bot-icon.png";
 import { StarIcon, CheckCircleIcon, ClockIcon, ChevronUpIcon, ChevronDownIcon, XMarkIcon, CpuChipIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
@@ -14,24 +14,26 @@ import { useUser } from "../contexts/UserContext";
 import { useLobbySettings } from "../hooks/useLobbySettings";
 import { usePlayerIcons } from "../hooks/usePlayerIcons";
 import { useRoles } from "../hooks/useRoles";
-import { type RoleAlignment, type Role, roleAlignment } from "../types/role";
+import { type Role, roleAlignment } from "../types/role";
 import { Tooltip } from "../components/Tooltip";
+
+const DEFAULT_META_SETTINGS: MetaSettings = {
+	maxPlayers: 10,
+	minPlayers: 5,
+	daySeconds: 60,
+	votingSeconds: 30,
+	nightSeconds: 60,
+	tieBehavior: "no_one_dies",
+	voteCountVisibility: "end",
+	anonymousVoting: false,
+	roleRevealOnDeath: true,
+	roleDistributionMode: "exact"
+};
 
 // Default empty lobby state used before the server sends real lobby data
 const DEFAULT_LOBBY_STATE: LobbyStateData = {
 	players: [],
-	metaSettings: {
-		maxPlayers: 10,
-		minPlayers: 5,
-		daySeconds: 60,
-		votingSeconds: 30,
-		nightSeconds: 60,
-		tieBehavior: "no_one_dies",
-		voteCountVisibility: "end",
-		anonymousVoting: false,
-		roleRevealOnDeath: true,
-		roleDistributionMode: "exact"
-	},
+	metaSettings: DEFAULT_META_SETTINGS,
 	roleSettings: {},
 	botSettings: {},
 	gameCode: "",
@@ -68,7 +70,7 @@ const GameLobby = () => {
 	const roles = useRoles();
 
 	// Local bot settings draft, saved when the bot settings tooltip closes
-	const [draftBotSettings, setDraftBotSettings] = useState<LobbyStateData["botSettings"]>({});
+	const [draftBotSettings, setDraftBotSettings] = useState<BotSettings>({});
 
 	// Action locks prevent duplicate websocket requests while one is already running
 	const mountedRef = useRef(true);
@@ -82,7 +84,7 @@ const GameLobby = () => {
 
 	// Refs used for game-start popup and bot settings tooltip handling
 	const startingPopupRef = useRef<string | null>(null);
-	const botSettingsInitialRef = useRef<{ botId: number; difficulty: typeof BotDifficulty[number]; playstyle: typeof BotPlaystyle[number] } | null>(null);
+	const botSettingsInitialRef = useRef<({ botId: number } & BotSettings[number]) | null>(null);
 	const botSettingsContentRef = useRef<HTMLDivElement | null>(null);
 	const botDifficultySelectRef = useRef<HTMLSelectElement | null>(null);
 	const botPlaystyleSelectRef = useRef<HTMLSelectElement | null>(null);
@@ -141,7 +143,7 @@ const GameLobby = () => {
 	}, []);
 
 	const playersBySeat = useMemo(() => {
-		const map = new Map<number, LobbyStateData["players"][number]>();
+		const map = new Map<number, LobbyPlayer>();
 
 		for (const p of lobbyState.players) {
 			map.set(p.seatNr, p);
@@ -325,8 +327,8 @@ const GameLobby = () => {
 		if (openBotSettingsId !== botId) return;
 
 		const initial = botSettingsInitialRef.current;
-		const selectedDifficulty = (botDifficultySelectRef.current?.value as typeof BotDifficulty[number] | undefined) ?? draftBotSettings[botId]?.difficulty;
-		const selectedPlaystyle = (botPlaystyleSelectRef.current?.value as typeof BotPlaystyle[number] | undefined) ?? draftBotSettings[botId]?.playstyle;
+		const selectedDifficulty = (botDifficultySelectRef.current?.value as BotDifficultyLevel | undefined) ?? draftBotSettings[botId]?.difficulty;
+		const selectedPlaystyle = (botPlaystyleSelectRef.current?.value as BotPlaystyleType | undefined) ?? draftBotSettings[botId]?.playstyle;
 
 		if ( initial && initial.botId === botId && selectedDifficulty && selectedPlaystyle && ( selectedDifficulty !== initial.difficulty || selectedPlaystyle !== initial.playstyle)) {
 			setDraftBotSettings((prev) => ({ ...prev, [botId]: { difficulty: selectedDifficulty, playstyle: selectedPlaystyle } }));
@@ -403,7 +405,7 @@ const GameLobby = () => {
 	}, [closeBotSettings, openBotSettingsId]);
 
 	// Update local bot settings draft before saving on close
-	const updateBotDraft = useCallback((botId: number, key: "difficulty" | "playstyle", value: LobbyStateData["botSettings"][number]["difficulty"] | LobbyStateData["botSettings"][number]["playstyle"]) => {
+	const updateBotDraft = useCallback(<K extends keyof BotSettings[number]>(botId: number, key: K, value: BotSettings[number][K]) => {
 		setDraftBotSettings((prev) => {
 			const current = prev[botId] ?? lobbyState.botSettings?.[botId] ?? { difficulty: BotDifficulty[0], playstyle: BotPlaystyle[0] };
 
@@ -617,7 +619,7 @@ const GameLobby = () => {
 																	className="custom-dropdown"
 																	name={`botDifficulty-${player.playerId}`}
 																	value={draftBotSettings[player.playerId]?.difficulty ?? lobbyState.botSettings?.[player.playerId]?.difficulty ?? BotDifficulty[0]}
-																	onChange={(e) => updateBotDraft(player.playerId, "difficulty", e.target.value as typeof BotDifficulty[number])}
+																	onChange={(e) => updateBotDraft(player.playerId, "difficulty", e.target.value as BotDifficultyLevel)}
 																>
 																	{BotDifficulty.map((difficulty) => (
 																		<option key={difficulty} value={difficulty}>
@@ -636,7 +638,7 @@ const GameLobby = () => {
 																	className="custom-dropdown"
 																	name={`botPlaystyle-${player.playerId}`}
 																	value={draftBotSettings[player.playerId]?.playstyle ?? lobbyState.botSettings?.[player.playerId]?.playstyle ?? BotPlaystyle[0]}
-																	onChange={(e) => updateBotDraft(player.playerId, "playstyle", e.target.value as typeof BotPlaystyle[number])}
+																	onChange={(e) => updateBotDraft(player.playerId, "playstyle", e.target.value as BotPlaystyleType)}
 																>
 																	{BotPlaystyle.map((playstyle) => (
 																		<option key={playstyle} value={playstyle}>
@@ -959,7 +961,7 @@ const GameLobby = () => {
 													className="custom-dropdown"
 													name="tieBehavior"
 													value={draftLobbySettings.metaSettings.tieBehavior}
-													onChange={(e) => applyMetaSetting("tieBehavior", e.target.value as MetaSettings["tieBehavior"])}
+													onChange={(e) => applyMetaSetting("tieBehavior", e.target.value as TieBehaviorType)}
 												>
 													{TieBehavior.map((behavior) => (
 														<option key={behavior} value={behavior}>
@@ -994,7 +996,7 @@ const GameLobby = () => {
 													onChange={(e) =>
 														applyMetaSetting(
 															"roleDistributionMode",
-															e.target.value as MetaSettings["roleDistributionMode"]
+															e.target.value as RoleDistributionModeType
 														)
 													}
 												>
@@ -1031,7 +1033,7 @@ const GameLobby = () => {
 													onChange={(e) =>
 														applyMetaSetting(
 															"voteCountVisibility",
-															e.target.value as MetaSettings["voteCountVisibility"]
+															e.target.value as VoteCountVisibilityType
 														)
 													}
 												>

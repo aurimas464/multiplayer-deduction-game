@@ -13,9 +13,7 @@ import defaultBotIcon from "../assets/default-bot-icon.png";
 import "../css/game.css";
 import { ErrorCode } from "../types";
 import type { GameFinishedPopupPayload } from "../types/popup";
-import type { GameFinishedResult, GameStateData, PersonalPhaseResult, PhaseResult, PlayerActionName, PhaseType } from "../types/websocket";
-
-type Phase = GameStateData["currentPhase"];
+import type { GameFinishedResult, GamePhase, GameStateData, PersonalPhaseResult, PhaseResult, PlayerActionName } from "../types/websocket";
 
 type ActionConfig = {
 	actionType: Exclude<PlayerActionName, "skip">;
@@ -24,7 +22,7 @@ type ActionConfig = {
 
 type PhaseResultsView = {
 	dayNumber: number;
-	resolvedPhase: Phase;
+	resolvedPhase: GamePhase;
 	result: PhaseResult;
 };
 
@@ -124,7 +122,7 @@ const Game = () => {
 		return player?.username ?? t("pages.game.players.unknown", { playerId: String(playerId) });
 	}, [t]);
 
-	const getPhaseDisplayName = useCallback((phase: Phase) => {
+	const getPhaseDisplayName = useCallback((phase: GamePhase) => {
 		return t(`pages.game.phases.${phase}`);
 	}, [t]);
 
